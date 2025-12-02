@@ -1,72 +1,60 @@
 package com.ezh.ezauth.auth.controller;
 
 
+import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.SignInRequest;
+import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
+import com.ezh.ezauth.auth.service.AuthService;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
+import com.ezh.ezauth.user.dto.UserInitResponse;
+import com.ezh.ezauth.utils.common.ResponseResource;
+import com.ezh.ezauth.utils.exception.CommonException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final TenantService tenantService;
+    private final AuthService authService;
 
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse> registerTenant(
-            @Valid @RequestBody TenantRegistrationRequest request) {
 
-        try {
-            TenantRegistrationResponse response = tenantService.registerTenant(request);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.builder()
-                            .success(true)
-                            .message("Tenant registered successfully")
-                            .data(response)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
+    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<TenantRegistrationResponse> registerTenant(@Valid @RequestBody TenantRegistrationRequest request) throws CommonException {
+        log.info("Entered register tenant with : {}", request);
+        TenantRegistrationResponse response = tenantService.registerTenant(request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Tenant registered successfully");
     }
 
-    @PostMapping("/signin")
-    public ResponseEntity<ApiResponse> signIn(
-            @Valid @RequestBody TenantSignInRequest request) {
+    @PostMapping(value = "/signin", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<AuthResponse> signIn(@Valid @RequestBody SignInRequest request) throws CommonException {
+        log.info("Entered signin with : {}", request);
+        AuthResponse response = authService.signIn(request);
+        return ResponseResource.success(HttpStatus.OK, response, "Sign in successful");
+    }
 
-        try {
-            TenantSignInResponse response = tenantService.signIn(request);
+    @GetMapping(value = "/user/init", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<UserInitResponse> initUser(HttpServletRequest request) throws CommonException {
+        String token = request.getHeader("Authorization").replace("Bearer ", "");
+        UserInitResponse response = authService.initUser(token);
+        return ResponseResource.success(HttpStatus.OK, response, "User init successful");
+    }
 
-            return ResponseEntity.ok(
-                    ApiResponse.builder()
-                            .success(true)
-                            .message("Sign in successful")
-                            .data(response)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    ApiResponse.builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
+    @PostMapping(value = "/refresh", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<AuthResponse> refreshToken(@RequestBody TokenRefreshRequest request) throws CommonException {
+        log.info("Entered refresh token with : {}", request);
+        AuthResponse response = authService.refreshToken(request);
+        return ResponseResource.success(HttpStatus.OK, response, "Token refreshed successfully");
     }
 
 

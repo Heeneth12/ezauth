@@ -23,6 +23,7 @@ import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.UserRoleRepository;
+import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -141,11 +142,6 @@ public class TenantService {
 
         userRoleRepository.save(userRole);
 
-        // 8. Generate JWT token for immediate login
-        String token = jwtTokenProvider.generateToken(adminUser.getUserUuid(),
-                adminUser.getEmail(),
-                tenant.getTenantUuid());
-
         // 9. Return response
         return TenantRegistrationResponse.builder()
                 .tenantId(tenant.getId())
@@ -154,12 +150,11 @@ public class TenantService {
                 .adminUserId(adminUser.getId())
                 .adminEmail(adminUser.getEmail())
                 .message("Tenant registered successfully")
-                .token(token)
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public TenantSignInResponse signIn(TenantSignInRequest request) {
+    public TenantSignInResponse signIn(TenantSignInRequest request) throws CommonException {
 
         // 1. Find user by email
         User user = userRepository.findByEmail(request.getEmail())
@@ -191,14 +186,8 @@ public class TenantService {
         Boolean isAdmin = user.getTenant().getTenantAdmin() != null &&
                 user.getTenant().getTenantAdmin().getId().equals(user.getId());
 
-        // 7. Generate JWT token
-        String token = jwtTokenProvider.generateToken(user.getUserUuid(),
-                user.getEmail(),
-                user.getTenant().getTenantUuid());
-
         // 8. Return response
         return TenantSignInResponse.builder()
-                .token(token)
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .email(user.getEmail())

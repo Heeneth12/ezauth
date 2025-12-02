@@ -16,5 +16,4 @@ public class TenantRegistrationResponse {
     private Long adminUserId;
     private String adminEmail;
     private String message;
-    private String token; // JWT token for immediate login
 }
