@@ -10,14 +10,12 @@ import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.exception.CommonException;
-import io.jsonwebtoken.Jwt;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

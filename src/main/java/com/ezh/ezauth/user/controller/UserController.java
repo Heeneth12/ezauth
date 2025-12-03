@@ -1,0 +1,60 @@
+package com.ezh.ezauth.user.controller;
+
+import com.ezh.ezauth.user.dto.CreateUserRequest;
+import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.user.service.UserService;
+import com.ezh.ezauth.utils.common.CommonResponse;
+import com.ezh.ezauth.utils.common.ResponseResource;
+import com.ezh.ezauth.utils.exception.CommonException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/user")
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserService userService;
+
+
+    @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createUser(@RequestBody CreateUserRequest request) throws CommonException {
+        log.info("Creating new user with email: {}", request.getEmail());
+        CommonResponse response = userService.createUser(request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "User created successfully");
+    }
+
+    @GetMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<UserDto>> getAllUsers() throws CommonException {
+        log.info("Fetching all users");
+        List<UserDto> response = userService.getAllUsers();
+        return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
+    }
+
+//    @GetMapping(value = "/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+//    public ResponseResource<UserDto> getUserById(@PathVariable Long userId) throws CommonException {
+//        log.info("Fetching user with ID: {}", userId);
+//        UserDto response = userService.getUserById(userId);
+//        return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
+//    }
+//
+//    @PutMapping(value = "/update/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+//    public ResponseResource<UserDto> updateUser(@PathVariable Long userId, @RequestBody CreateUserRequest request) throws CommonException {
+//        log.info("Updating user with ID: {}", userId);
+//        UserDto response = userService.updateUser(userId, request);
+//        return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");
+//    }
+//
+//    @DeleteMapping(value = "/delete/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+//    public ResponseResource<CommonResponse> deleteUser(@PathVariable Long userId) throws CommonException {
+//        log.info("Deleting user with ID: {}", userId);
+//        userService.deleteUser(userId);
+//        return ResponseResource.success(HttpStatus.OK, null, "User deleted successfully");
+//    }
+}
