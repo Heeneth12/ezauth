@@ -3,6 +3,7 @@ package com.ezh.ezauth.user.dto;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -15,7 +16,6 @@ public class UserApplicationDto {
     private Long id;
     private String appName;
     private String appKey;
-    private Set<UserModulePrivilegeDto> modulePrivileges;
+    private Map<String, Set<String>> modulePrivileges;
     private Boolean isActive = true;
-    private LocalDateTime assignedAt;
 }

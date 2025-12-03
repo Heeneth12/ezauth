@@ -7,6 +7,7 @@ import com.ezh.ezauth.user.dto.UserApplicationDto;
 import com.ezh.ezauth.user.dto.UserInitResponse;
 import com.ezh.ezauth.user.dto.UserModulePrivilegeDto;
 import com.ezh.ezauth.user.entity.User;
+import com.ezh.ezauth.user.entity.UserApplication;
 import com.ezh.ezauth.user.entity.UserModulePrivilege;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
@@ -14,9 +15,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,17 +38,8 @@ public class UserService {
                         .id(ua.getId())
                         .appKey(ua.getApplication().getAppKey())
                         .appName(ua.getApplication().getAppName())
-                        .assignedAt(ua.getAssignedAt())
                         .isActive(ua.getIsActive())
-                        .modulePrivileges(
-                                ua.getModulePrivileges().stream()
-                                        .map(ump -> UserModulePrivilegeDto.builder()
-                                                .moduleKey(ump.getModule().getModuleKey())
-//                                                .moduleName(ump.getModule().getModuleName())
-                                                .privilegeKey(getPrivileges(ump.getModule().getId(), ump.getUserApplication().getId()))
-                                                .build()
-                                        ).collect(Collectors.toSet())
-                        )
+                        .modulePrivileges(groupModulePrivileges(ua))   // ✔ FIXED HERE
                         .build()
                 ).collect(Collectors.toSet());
 
@@ -76,6 +66,27 @@ public class UserService {
                 .stream()
                 .map(Privilege::getPrivilegeKey)
                 .collect(Collectors.toSet());
+    }
+
+    private Map<String, Set<String>> groupModulePrivileges(UserApplication ua) {
+
+        Map<String, Set<String>> result = new HashMap<>();
+
+        ua.getModulePrivileges().forEach(ump -> {
+            String moduleKey = ump.getModule().getModuleKey();
+
+            // Fetch all privileges for this module & userApplication
+            Set<String> privileges = getPrivileges(
+                    ump.getModule().getId(),
+                    ump.getUserApplication().getId()
+            );
+
+            // Add to map (merge duplicates automatically)
+            result.computeIfAbsent(moduleKey, k -> new HashSet<>())
+                    .addAll(privileges);
+        });
+
+        return result;
     }
 
 
