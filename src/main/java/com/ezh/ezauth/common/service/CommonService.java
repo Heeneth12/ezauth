@@ -26,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -61,85 +62,35 @@ public class CommonService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoleDto> getAllRoles() throws CommonException{
-        log.info("");
+    public List<RoleDto> getAllRoles() throws CommonException {
+        log.info("Fetching all roles");
         List<Role> roles = roleRepository.findAll();
+
+        if (roles.isEmpty()) {
+            log.warn("No roles found in the system");
+            return Collections.emptyList();
+        }
 
         return roles.stream().map(this::constructRoleDto).toList();
     }
 
 
-    public Object getModulesByApplication(Long appId) {
-        return moduleRepository.findByApplicationId(appId);
+    @Transactional(readOnly = true)
+    public List<ModuleDto> getModulesByApplication(Long appId) throws CommonException {
+
+        log.info("Fetching modules for applicationId={}", appId);
+
+        List<Module> modules = moduleRepository.findByApplicationId(appId);
+
+        if (modules.isEmpty()) {
+            log.warn("No modules found for applicationId={}", appId);
+            return Collections.emptyList();
+        }
+
+        return modules.stream()
+                .map(this::constructModuleDto)
+                .toList();
     }
-
-
-
-//
-//    // ===============================
-//    // 3. GET PRIVILEGES OF MODULE
-//    // ===============================
-//    public Object getPrivilegesByModule(Long moduleId) {
-//        return privilegeRepository.findByModuleId(moduleId);
-//    }
-//
-//    public Object updateUserAccess(Long userId, UserAccessUpdateRequest request) {
-//
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> new RuntimeException("User Not Found"));
-//
-//        // Delete existing access
-//        userModulePrivilegeRepository.deleteByUserId(userId);
-//
-//        // Re-create access cleanly
-//        request.getApplications().forEach(appReq -> {
-//            appReq.getModules().forEach(modReq -> {
-//                UserModulePrivilege ump = new UserModulePrivilege();
-//                ump.setUser(user);
-//                ump.setModule(moduleRepository.findById(modReq.getModuleId())
-//                        .orElseThrow(() -> new RuntimeException("Module not found")));
-//
-//                Set<String> privilegeKeys = modReq.getPrivilegeKeys();
-//
-//                ump.setPrivileges(
-//                        privilegeRepository.findByPrivilegeKeyIn(privilegeKeys)
-//                );
-//
-//                userModulePrivilegeRepository.save(ump);
-//            });
-//        });
-//
-//        return "User Access Updated Successfully";
-//    }
-
-
-    private UserDto constructUserDto(User user) {
-        if (user == null) return null;
-
-        return UserDto.builder()
-                .id(user.getId())
-                .userUuid(user.getUserUuid())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .isActive(user.getIsActive())
-                .tenant( constructTenantDto(user.getTenant()) )
-                .build();
-    }
-
-    private TenantDto constructTenantDto(Tenant tenant) {
-        if (tenant == null) return null;
-
-        return TenantDto.builder()
-                .id(tenant.getId())
-                .tenantUuid(tenant.getTenantUuid())
-                .tenantName(tenant.getTenantName())
-                .tenantCode(tenant.getTenantCode())
-                .isActive(tenant.getIsActive())
-                .build();
-    }
-
-
 
     private ApplicationDto constructDtoFromEntity(Application application) {
 
@@ -151,14 +102,14 @@ public class CommonService {
                 .appKey(application.getAppKey())
                 .description(application.getDescription())
                 .isActive(application.getIsActive())
-                .modules(
-                        application.getModules() != null
-                                ? application.getModules()
-                                .stream()
-                                .map(this::constructModuleDto)
-                                .collect(Collectors.toSet())
-                                : null
-                )
+//                .modules(
+//                        application.getModules() != null
+//                                ? application.getModules()
+//                                .stream()
+//                                .map(this::constructModuleDto)
+//                                .collect(Collectors.toSet())
+//                                : null
+//                )
                 .build();
     }
 
@@ -204,6 +155,5 @@ public class CommonService {
                 .roleKey(role.getRoleKey())
                 .build();
     }
-
 
 }
