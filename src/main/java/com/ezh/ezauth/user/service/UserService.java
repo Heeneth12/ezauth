@@ -10,7 +10,6 @@ import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.PrivilegeRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.tenant.dto.TenantDto;
-import com.ezh.ezauth.tenant.dto.TenantRegistrationRequest;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.*;
@@ -135,21 +134,21 @@ public class UserService {
         if (request.getPrivilegeMapping() != null) {
 
             for (PrivilegeAssignRequest pm : request.getPrivilegeMapping()) {
-
-                // Find the application assigned to user
+                // 1. Find the application assigned to user
                 UserApplication ua = userApplications.stream()
                         .filter(x -> x.getApplication().getId().equals(pm.getApplicationId()))
                         .findFirst()
                         .orElseThrow(() -> new CommonException("Application not assigned to user", HttpStatus.BAD_REQUEST));
 
-                // Find module
+                // 2. Find module
                 Module module = moduleRepository.findById(pm.getModuleId())
                         .orElseThrow(() -> new CommonException("Invalid module", HttpStatus.BAD_REQUEST));
 
-                // Fetch privilege entities
+                // 3. Fetch privilege entities
                 List<Privilege> privileges = privilegeRepository.findAllById(pm.getPrivilegeIds());
 
-                Set<UserModulePrivilege> modulePrivileges = privileges.stream()
+                // 4. Create the mapping entities
+                Set<UserModulePrivilege> newModulePrivileges = privileges.stream()
                         .map(p -> UserModulePrivilege.builder()
                                 .userApplication(ua)
                                 .module(module)
@@ -158,7 +157,13 @@ public class UserService {
                                 .build()
                         ).collect(Collectors.toSet());
 
-                ua.setModulePrivileges(modulePrivileges);
+                // Initialize the list if it's null (Lombok @Builder leaves collections null by default)
+                if (ua.getModulePrivileges() == null) {
+                    ua.setModulePrivileges(new HashSet<>());
+                }
+
+                // Add to the existing set instead of overwriting it
+                ua.getModulePrivileges().addAll(newModulePrivileges);
             }
         }
 
@@ -171,6 +176,116 @@ public class UserService {
                 .build();
     }
 
+
+    @Transactional
+    public CommonResponse updateUser(Long userId, CreateUserRequest request) throws CommonException {
+
+        // 1. Fetch Existing User
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        // 2. Update Basic Fields
+        user.setFullName(request.getFullName());
+        user.setPhone(request.getPhone());
+        // Note: Usually we don't update Email or Password here unless specific logic allows it.
+        // If you want to update password:
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+
+        // 3. Update Roles (Clear existing -> Add new)
+        if (request.getRoleIds() != null) {
+            // Clear existing roles. Thanks to orphanRemoval=true, these are deleted from DB.
+            if (user.getUserRoles() != null) {
+                user.getUserRoles().clear();
+            } else {
+                user.setUserRoles(new HashSet<>());
+            }
+
+            if (!request.getRoleIds().isEmpty()) {
+                Set<UserRole> newRoles = request.getRoleIds().stream()
+                        .map(roleId -> {
+                            Role role = roleRepository.findById(roleId)
+                                    .orElseThrow(() -> new CommonException("Invalid role ID: " + roleId, HttpStatus.BAD_REQUEST));
+                            return UserRole.builder()
+                                    .role(role)
+                                    .user(user) // Link back to existing user
+                                    .build();
+                        })
+                        .collect(Collectors.toSet());
+                user.getUserRoles().addAll(newRoles);
+            }
+        }
+
+        // 4. Update Applications & Privileges
+        // Strategy: We clear all existing applications and rebuild them based on the request.
+        // This ensures that any application NOT in the request is removed.
+
+        if (request.getApplicationIds() != null) {
+            // Clear existing apps (and their child privileges due to cascade)
+            if (user.getUserApplications() != null) {
+                user.getUserApplications().clear();
+            } else {
+                user.setUserApplications(new HashSet<>());
+            }
+
+            List<Application> apps = applicationRepository.findAllById(request.getApplicationIds());
+
+            // Create the new UserApplication objects
+            for (Application app : apps) {
+                UserApplication ua = UserApplication.builder()
+                        .user(user)
+                        .application(app)
+                        .isActive(true)
+                        .modulePrivileges(new HashSet<>()) // Initialize the Set immediately
+                        .build();
+
+                user.getUserApplications().add(ua);
+            }
+        }
+
+        // 5. Update Privileges (Module Wise)
+        // We iterate the mapping request and attach privileges to the UserApplications we just created above.
+        if (request.getPrivilegeMapping() != null && user.getUserApplications() != null) {
+
+            for (PrivilegeAssignRequest pm : request.getPrivilegeMapping()) {
+
+                // Find the UserApplication object we just added to the user list above
+                UserApplication ua = user.getUserApplications().stream()
+                        .filter(x -> x.getApplication().getId().equals(pm.getApplicationId()))
+                        .findFirst()
+                        .orElseThrow(() -> new CommonException("Application ID " + pm.getApplicationId() + " is in privilege mapping but not in assigned application list", HttpStatus.BAD_REQUEST));
+
+                // Find module
+                Module module = moduleRepository.findById(pm.getModuleId())
+                        .orElseThrow(() -> new CommonException("Invalid module", HttpStatus.BAD_REQUEST));
+
+                // Fetch privilege entities
+                List<Privilege> privileges = privilegeRepository.findAllById(pm.getPrivilegeIds());
+
+                // Build the new privilege links
+                Set<UserModulePrivilege> newModulePrivileges = privileges.stream()
+                        .map(p -> UserModulePrivilege.builder()
+                                .userApplication(ua)
+                                .module(module)
+                                .privilege(p)
+                                .isActive(true)
+                                .build()
+                        ).collect(Collectors.toSet());
+
+                // Add to the existing set (This is the fix from previous step)
+                ua.getModulePrivileges().addAll(newModulePrivileges);
+            }
+        }
+
+        User savedUser = userRepository.save(user);
+
+        return CommonResponse.builder()
+                .id(savedUser.getId().toString())
+                .message("User successfully updated")
+                .status(Status.SUCCESS)
+                .build();
+    }
 
     public List<UserDto> getAllUsers() throws CommonException {
         log.info("Fetching all users");
@@ -198,7 +313,6 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
-                .tenant(constructTenantDto(user.getTenant()))
                 .build();
     }
 

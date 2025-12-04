@@ -47,10 +47,10 @@ public class User {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserApplication> userApplications;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserRole> userRoles;
 
     @CreationTimestamp

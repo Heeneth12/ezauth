@@ -34,7 +34,7 @@ public class UserApplication {
     @JoinColumn(name = "application_id", nullable = false)
     private Application application;
 
-    @OneToMany(mappedBy = "userApplication", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "userApplication", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserModulePrivilege> modulePrivileges;
 
     @Column(name = "is_active", nullable = false)

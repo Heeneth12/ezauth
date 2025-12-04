@@ -17,5 +17,5 @@ public class ApplicationDto {
     private String appKey;
     private String description;
     private Boolean isActive = true;
-    private Set<ModuleDto> modules;
+    //private Set<ModuleDto> modules;
 }
