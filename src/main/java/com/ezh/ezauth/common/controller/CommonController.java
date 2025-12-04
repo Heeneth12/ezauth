@@ -4,9 +4,9 @@ package com.ezh.ezauth.common.controller;
 import com.ezh.ezauth.common.dto.ApplicationDto;
 import com.ezh.ezauth.common.dto.RoleDto;
 import com.ezh.ezauth.common.service.CommonService;
+import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -24,33 +24,37 @@ public class CommonController {
     private final CommonService commonService;
 
     @GetMapping(value = "/app/all", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<List<ApplicationDto>> getAllApplication(HttpServletRequest request) throws CommonException {
+    public ResponseResource<List<ApplicationDto>> getAllApplication() throws CommonException {
         log.info("Entered get all applications");
-        String token = request.getHeader("Authorization").replace("Bearer ", "");
-        List<ApplicationDto> response = commonService.getAllApplications(token);
+        List<ApplicationDto> response = commonService.getAllApplications();
         return ResponseResource.success(HttpStatus.CREATED, response, "Tenant registered successfully");
     }
 
     @GetMapping(value = "/role/all", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<List<RoleDto>> getAllRoles(HttpServletRequest request) throws CommonException {
+    public ResponseResource<List<RoleDto>> getAllRoles() throws CommonException {
         log.info("Entered get all roles");
         List<RoleDto> response = commonService.getAllRoles();
-        return ResponseResource.success(HttpStatus.CREATED, response, "User roles feched  successfully");
+        return ResponseResource.success(HttpStatus.CREATED, response, "User roles fetched  successfully");
+    }
+
+    @PostMapping(value = "/role/create", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createRole(@RequestBody RoleDto roleDto) throws CommonException {
+        log.info("Entered create role");
+        CommonResponse response = commonService.createRole(roleDto);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Role created successfully");
     }
 
     @GetMapping(value = "/apps/{appId}/modules", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<?> getModulesByApplication(@PathVariable Long appId) throws CommonException{
-        log.info("Fetching modules for appId: {}", appId);
+        log.info("Entered get modules for appId: {}", appId);
         Object response = commonService.getModulesByApplication(appId);
         return ResponseResource.success(HttpStatus.OK, response, "Modules fetched successfully");
     }
 
-    @GetMapping("/modules/{moduleId}/privileges")
+    @GetMapping(value = "/modules/{moduleId}/privileges", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<?> getPrivilegesByModule(@PathVariable Long moduleId) throws CommonException{
-        log.info("Fetching privileges for moduleId: {}", moduleId);
+        log.info("Entered get privileges for moduleId: {}", moduleId);
         Object response = new Object();
         return ResponseResource.success(HttpStatus.OK, response, "Privileges fetched successfully");
     }
-
-
 }

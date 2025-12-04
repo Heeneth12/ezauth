@@ -1,9 +1,7 @@
 package com.ezh.ezauth.common.dto;
 
-import com.ezh.ezauth.common.entity.Module;
 import lombok.*;
 
-import java.util.Set;
 
 
 @Getter

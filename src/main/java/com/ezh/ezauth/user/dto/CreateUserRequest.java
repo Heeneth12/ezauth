@@ -28,9 +28,6 @@ public class CreateUserRequest {
     @NotBlank(message = "Password number is required")
     private String password;
 
-    @NotNull(message = "Tenant ID is required")
-    private Long tenantId;
-
     private Set<Long> roleIds;
     private Set<Long> applicationIds;
     private List<PrivilegeAssignRequest> privilegeMapping;

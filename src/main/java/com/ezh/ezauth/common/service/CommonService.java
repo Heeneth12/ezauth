@@ -10,19 +10,17 @@ import com.ezh.ezauth.common.entity.Privilege;
 import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
-import com.ezh.ezauth.common.repository.PrivilegeRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.security.JwtTokenProvider;
-import com.ezh.ezauth.tenant.dto.TenantDto;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
-import com.ezh.ezauth.user.dto.UserDto;
-import com.ezh.ezauth.user.entity.User;
-import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
-import com.ezh.ezauth.user.repository.UserRepository;
+import com.ezh.ezauth.utils.UserContextUtil;
+import com.ezh.ezauth.utils.common.CommonResponse;
+import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,17 +35,21 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CommonService {
 
-    private final ApplicationRepository applicationRepository;
     private final ModuleRepository moduleRepository;
     private final RoleRepository roleRepository;
     private final TenantRepository tenantRepository;
-    private final JwtTokenProvider jwtTokenProvider;
 
 
     @Transactional(readOnly = true)
-    public List<ApplicationDto> getAllApplications(String token) throws CommonException {
+    public List<ApplicationDto> getAllApplications() throws CommonException {
         log.info("Fetching all applications");
-        Long tenantId = jwtTokenProvider.getTenantIdFromToken(token);
+
+        // Get tenant id from context
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+
         Set<Application> applications = tenantRepository.findApplicationsByTenantId(tenantId);
 
         if (applications.isEmpty()) {
@@ -74,6 +76,35 @@ public class CommonService {
         return roles.stream().map(this::constructRoleDto).toList();
     }
 
+    @Transactional
+    public CommonResponse createRole(RoleDto roleDto) throws CommonException {
+        log.info("Create role with : {}", roleDto);
+
+        // Get tenant id from context
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        // Create role
+        Role role = Role.builder()
+                .roleKey(roleDto.getRoleKey())
+                .roleName(roleDto.getRoleName())
+                .description(roleDto.getDescription())
+                .tenant(tenant)
+                .isActive(true)
+                .isSystemRole(false)
+                .build();
+
+        roleRepository.save(role);
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Role created successfully")
+                .build();
+    }
 
     @Transactional(readOnly = true)
     public List<ModuleDto> getModulesByApplication(Long appId) throws CommonException {
@@ -102,14 +133,6 @@ public class CommonService {
                 .appKey(application.getAppKey())
                 .description(application.getDescription())
                 .isActive(application.getIsActive())
-//                .modules(
-//                        application.getModules() != null
-//                                ? application.getModules()
-//                                .stream()
-//                                .map(this::constructModuleDto)
-//                                .collect(Collectors.toSet())
-//                                : null
-//                )
                 .build();
     }
 

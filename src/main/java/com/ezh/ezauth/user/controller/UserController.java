@@ -25,14 +25,14 @@ public class UserController {
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> createUser(@RequestBody CreateUserRequest request) throws CommonException {
-        log.info("Creating new user with email: {}", request.getEmail());
+        log.info("Entered Creating new user with email: {}", request.getEmail());
         CommonResponse response = userService.createUser(request);
         return ResponseResource.success(HttpStatus.CREATED, response, "User created successfully");
     }
 
     @GetMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<List<UserDto>> getAllUsers() throws CommonException {
-        log.info("Fetching all users");
+        log.info("Entered get all users details");
         List<UserDto> response = userService.getAllUsers();
         return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
     }

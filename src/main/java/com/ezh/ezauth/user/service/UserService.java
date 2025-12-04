@@ -19,6 +19,7 @@ import com.ezh.ezauth.user.entity.UserModulePrivilege;
 import com.ezh.ezauth.user.entity.UserRole;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
+import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -84,7 +85,12 @@ public class UserService {
     @Transactional()
     public CommonResponse createUser(CreateUserRequest request) throws CommonException {
 
-        Tenant tenant = tenantRepository.findById(request.getTenantId())
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+
+        Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Invalid tenant", HttpStatus.BAD_REQUEST));
 
         User user = User.builder()
@@ -106,6 +112,7 @@ public class UserService {
                         return UserRole.builder()
                                 .role(role)
                                 .user(user)
+                                .isActive(true)
                                 .build();
                     })
                     .collect(Collectors.toSet());
@@ -287,10 +294,17 @@ public class UserService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() throws CommonException {
         log.info("Fetching all users");
 
-        List<User> users = userRepository.findAll();
+        // Get tenant id from context
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+
+        List<User> users = userRepository.findByTenant_Id(tenantId);
         if (users.isEmpty()) {
             log.warn("No users found");
             return List.of();
@@ -313,7 +327,16 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
+                .roles(userRoles(user.getUserRoles()))
                 .build();
+    }
+
+    private Set<String> userRoles(Set<UserRole> roles) {
+        if (roles == null || roles.isEmpty()) return Set.of();
+
+        return roles.stream()
+                .map(ur -> ur.getRole().getRoleKey())
+                .collect(Collectors.toSet());
     }
 
     private TenantDto constructTenantDto(Tenant tenant) {
