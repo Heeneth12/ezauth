@@ -1,8 +1,11 @@
 package com.ezh.ezauth.user.entity;
+
 import com.ezh.ezauth.common.entity.Module;
 import com.ezh.ezauth.common.entity.Privilege;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -22,7 +25,6 @@ public class UserModulePrivilege {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Link to user + application combination
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_application_id", nullable = false)
     private UserApplication userApplication;
@@ -37,4 +39,30 @@ public class UserModulePrivilege {
 
     @Column(nullable = false)
     private Boolean isActive = true;
+
+    // --------------------------------------------------------
+    // IDENTITY LOGIC (Fixes the Duplicate Entry Error)
+    // --------------------------------------------------------
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserModulePrivilege that = (UserModulePrivilege) o;
+
+        // 1. If both have IDs, match by ID
+        if (this.id != null && that.id != null) {
+            return Objects.equals(this.id, that.id);
+        }
+
+        // 2. Otherwise match by Business Key (UserApp + Module + Privilege)
+        return Objects.equals(userApplication, that.userApplication) &&
+                Objects.equals(module, that.module) &&
+                Objects.equals(privilege, that.privilege);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(userApplication, module, privilege);
+    }
 }

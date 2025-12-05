@@ -200,88 +200,135 @@ public class UserService {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
 
-        // 3. Update Roles (Clear existing -> Add new)
+        // 3. Update Roles (Smart Update: Remove unselected, Add new selected)
         if (request.getRoleIds() != null) {
-            // Clear existing roles. Thanks to orphanRemoval=true, these are deleted from DB.
-            if (user.getUserRoles() != null) {
-                user.getUserRoles().clear();
-            } else {
+            if (user.getUserRoles() == null) {
                 user.setUserRoles(new HashSet<>());
             }
 
-            if (!request.getRoleIds().isEmpty()) {
-                Set<UserRole> newRoles = request.getRoleIds().stream()
-                        .map(roleId -> {
-                            Role role = roleRepository.findById(roleId)
-                                    .orElseThrow(() -> new CommonException("Invalid role ID: " + roleId, HttpStatus.BAD_REQUEST));
-                            return UserRole.builder()
-                                    .role(role)
-                                    .user(user) // Link back to existing user
-                                    .build();
-                        })
-                        .collect(Collectors.toSet());
-                user.getUserRoles().addAll(newRoles);
-            }
+            Set<Long> newRoleIds = new HashSet<>(request.getRoleIds());
+
+            // A. Remove roles that are NOT in the new request
+            // This physically deletes the row from DB due to orphanRemoval=true
+            user.getUserRoles().removeIf(existingUserRole ->
+                    !newRoleIds.contains(existingUserRole.getRole().getId()));
+
+            // B. Add roles that are in the request but NOT yet in the user's list
+            // First, get list of IDs currently assigned (after the removal step above)
+            Set<Long> existingRoleIds = user.getUserRoles().stream()
+                    .map(ur -> ur.getRole().getId())
+                    .collect(Collectors.toSet());
+
+            // Filter the request for IDs that we don't have yet
+            Set<UserRole> rolesToAdd = newRoleIds.stream()
+                    .filter(roleId -> !existingRoleIds.contains(roleId))
+                    .map(roleId -> {
+                        Role role = roleRepository.findById(roleId)
+                                .orElseThrow(() -> new CommonException("Invalid role ID: " + roleId, HttpStatus.BAD_REQUEST));
+                        return UserRole.builder()
+                                .role(role)
+                                .user(user)
+                                .isActive(true)
+                                .build();
+                    })
+                    .collect(Collectors.toSet());
+
+            user.getUserRoles().addAll(rolesToAdd);
         }
 
         // 4. Update Applications & Privileges
         // Strategy: We clear all existing applications and rebuild them based on the request.
         // This ensures that any application NOT in the request is removed.
 
+        // 4. Update Applications (Smart Update)
         if (request.getApplicationIds() != null) {
-            // Clear existing apps (and their child privileges due to cascade)
-            if (user.getUserApplications() != null) {
-                user.getUserApplications().clear();
-            } else {
+            if (user.getUserApplications() == null) {
                 user.setUserApplications(new HashSet<>());
             }
 
-            List<Application> apps = applicationRepository.findAllById(request.getApplicationIds());
+            Set<Long> newAppIds = new HashSet<>(request.getApplicationIds());
 
-            // Create the new UserApplication objects
-            for (Application app : apps) {
-                UserApplication ua = UserApplication.builder()
-                        .user(user)
-                        .application(app)
-                        .isActive(true)
-                        .modulePrivileges(new HashSet<>()) // Initialize the Set immediately
-                        .build();
+            // A. Remove apps not in request
+            user.getUserApplications().removeIf(ua ->
+                    !newAppIds.contains(ua.getApplication().getId()));
 
-                user.getUserApplications().add(ua);
+            // B. Add new apps
+            Set<Long> existingAppIds = user.getUserApplications().stream()
+                    .map(ua -> ua.getApplication().getId())
+                    .collect(Collectors.toSet());
+
+            for (Long appId : newAppIds) {
+                if (!existingAppIds.contains(appId)) {
+                    Application app = applicationRepository.findById(appId)
+                            .orElseThrow(() -> new CommonException("App not found", HttpStatus.BAD_REQUEST));
+
+                    UserApplication ua = UserApplication.builder()
+                            .user(user)
+                            .application(app)
+                            .isActive(true)
+                            .modulePrivileges(new HashSet<>())
+                            .build();
+
+                    user.getUserApplications().add(ua);
+                }
             }
         }
 
         // 5. Update Privileges (Module Wise)
         // We iterate the mapping request and attach privileges to the UserApplications we just created above.
+        // 5. Update Privileges (Module Wise)
         if (request.getPrivilegeMapping() != null && user.getUserApplications() != null) {
 
             for (PrivilegeAssignRequest pm : request.getPrivilegeMapping()) {
 
-                // Find the UserApplication object we just added to the user list above
+                // A. Find the UserApplication
                 UserApplication ua = user.getUserApplications().stream()
                         .filter(x -> x.getApplication().getId().equals(pm.getApplicationId()))
                         .findFirst()
-                        .orElseThrow(() -> new CommonException("Application ID " + pm.getApplicationId() + " is in privilege mapping but not in assigned application list", HttpStatus.BAD_REQUEST));
+                        .orElseThrow(() -> new CommonException("Application ID mismatch", HttpStatus.BAD_REQUEST));
 
-                // Find module
+                // Ensure the set is initialized
+                if (ua.getModulePrivileges() == null) {
+                    ua.setModulePrivileges(new HashSet<>());
+                }
+
+                // B. Identify the target privilege IDs for this specific Module
+                Set<Long> requestPrivilegeIds = new HashSet<>(pm.getPrivilegeIds());
+
+                // C. REMOVE privileges for this module that are NOT in the request
+                // (We filter by Module ID first, so we don't accidentally delete privileges from OTHER modules)
+                ua.getModulePrivileges().removeIf(ump ->
+                        ump.getModule().getId().equals(pm.getModuleId()) &&
+                                !requestPrivilegeIds.contains(ump.getPrivilege().getId())
+                );
+
+                // D. ADD privileges that are in the request but NOT in the DB
+                // Get list of currently assigned privilege IDs for this module
+                Set<Long> existingPrivilegeIds = ua.getModulePrivileges().stream()
+                        .filter(ump -> ump.getModule().getId().equals(pm.getModuleId()))
+                        .map(ump -> ump.getPrivilege().getId())
+                        .collect(Collectors.toSet());
+
+                // Find Module Entity (Fetch once)
                 Module module = moduleRepository.findById(pm.getModuleId())
                         .orElseThrow(() -> new CommonException("Invalid module", HttpStatus.BAD_REQUEST));
 
-                // Fetch privilege entities
-                List<Privilege> privileges = privilegeRepository.findAllById(pm.getPrivilegeIds());
+                // Find Privilege Entities
+                List<Privilege> allPrivileges = privilegeRepository.findAllById(pm.getPrivilegeIds());
 
-                // Build the new privilege links
-                Set<UserModulePrivilege> newModulePrivileges = privileges.stream()
-                        .map(p -> UserModulePrivilege.builder()
+                for (Privilege priv : allPrivileges) {
+                    // Only add if it doesn't exist
+                    if (!existingPrivilegeIds.contains(priv.getId())) {
+                        UserModulePrivilege newUmp = UserModulePrivilege.builder()
                                 .userApplication(ua)
                                 .module(module)
-                                .privilege(p)
+                                .privilege(priv)
                                 .isActive(true)
-                                .build()
-                        ).collect(Collectors.toSet());
+                                .build();
 
-                // Add to the existing set (This is the fix from previous step)
-                ua.getModulePrivileges().addAll(newModulePrivileges);
+                        ua.getModulePrivileges().add(newUmp);
+                    }
+                }
             }
         }
 
@@ -314,6 +361,74 @@ public class UserService {
                 .map(this::constructUserDto)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+
+    @Transactional(readOnly = true)
+    public UserDto getUser(Long userId) throws CommonException {
+        log.info("Fetching  user by id : {}", userId);
+
+        // Get tenant id from context
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("", HttpStatus.BAD_REQUEST));
+
+        return constructUserDto(user);
+
+    }
+
+    @Transactional(readOnly = true)
+    public UserEditResponse getUserForEdit(Long userId) throws CommonException {
+
+        Long tenantId = UserContextUtil.getTenantId();
+        if (tenantId == null) {
+            throw new CommonException("Tenant id missing in request", HttpStatus.UNAUTHORIZED);
+        }
+        // 1. Fetch User with associations
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        // 2. Map Roles to List of IDs
+        List<Long> roleIds = user.getUserRoles().stream()
+                .filter(UserRole::getIsActive) // Optional: only active roles
+                .map(ur -> ur.getRole().getId())
+                .collect(Collectors.toList());
+
+        // 3. Map Applications and their Nested Privileges
+        List<UserEditResponse.UserAppEditDto> appDtos = user.getUserApplications().stream()
+                .filter(UserApplication::getIsActive) // Only active apps
+                .map(ua -> {
+
+                    // Map nested Module Privileges
+                    List<UserEditResponse.UserModulePrivilegeDto> privDtos = ua.getModulePrivileges().stream()
+                            .filter(UserModulePrivilege::getIsActive)
+                            .map(ump -> UserEditResponse.UserModulePrivilegeDto.builder()
+                                    .moduleId(ump.getModule().getId())
+                                    .privilegeId(ump.getPrivilege().getId())
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    return UserEditResponse.UserAppEditDto.builder()
+                            .applicationId(ua.getApplication().getId())
+                            .isActive(ua.getIsActive())
+                            .modulePrivileges(privDtos)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // 4. Build Final Response
+        return UserEditResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .isActive(user.getIsActive())
+                .roleIds(roleIds)
+                .userApplications(appDtos)
+                .build();
     }
 
 
@@ -379,6 +494,5 @@ public class UserService {
 
         return result;
     }
-
 
 }

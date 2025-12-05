@@ -2,6 +2,7 @@ package com.ezh.ezauth.user.dto;
 
 import lombok.*;
 
+import java.util.List;
 import java.util.Set;
 
 
@@ -17,6 +18,8 @@ public class UserDto {
     private String email;
     private String phone;
     private Set<String> roles;
+    private List<UserRoleDto> userRoles;
+    private Set<Long> applicationIds;
     private Boolean isActive;
     private Long tenantId;
 }

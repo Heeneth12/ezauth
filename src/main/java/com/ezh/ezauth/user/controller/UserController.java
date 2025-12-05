@@ -2,6 +2,7 @@ package com.ezh.ezauth.user.controller;
 
 import com.ezh.ezauth.user.dto.CreateUserRequest;
 import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.user.dto.UserEditResponse;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
@@ -37,19 +38,19 @@ public class UserController {
         return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
     }
 
-//    @GetMapping(value = "/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
-//    public ResponseResource<UserDto> getUserById(@PathVariable Long userId) throws CommonException {
-//        log.info("Fetching user with ID: {}", userId);
-//        UserDto response = userService.getUserById(userId);
-//        return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
-//    }
-//
-//    @PutMapping(value = "/update/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-//    public ResponseResource<UserDto> updateUser(@PathVariable Long userId, @RequestBody CreateUserRequest request) throws CommonException {
-//        log.info("Updating user with ID: {}", userId);
-//        UserDto response = userService.updateUser(userId, request);
-//        return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");
-//    }
+    @GetMapping(value = "/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<UserEditResponse> getUserById(@PathVariable Long userId) throws CommonException {
+        log.info("Fetching user with ID: {}", userId);
+        UserEditResponse response = userService.getUserForEdit(userId);
+        return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
+    }
+
+    @PostMapping(value = "/{userId}/update", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateUser(@PathVariable Long userId, @RequestBody CreateUserRequest request) throws CommonException {
+        log.info("Updating user with ID: {}", userId);
+        CommonResponse response = userService.updateUser(userId, request);
+        return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");
+    }
 //
 //    @DeleteMapping(value = "/delete/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
 //    public ResponseResource<CommonResponse> deleteUser(@PathVariable Long userId) throws CommonException {
