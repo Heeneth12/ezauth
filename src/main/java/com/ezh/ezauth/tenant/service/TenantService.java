@@ -9,10 +9,7 @@ import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.security.JwtTokenProvider;
-import com.ezh.ezauth.tenant.dto.TenantRegistrationRequest;
-import com.ezh.ezauth.tenant.dto.TenantRegistrationResponse;
-import com.ezh.ezauth.tenant.dto.TenantSignInRequest;
-import com.ezh.ezauth.tenant.dto.TenantSignInResponse;
+import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.entity.User;
@@ -26,6 +23,10 @@ import com.ezh.ezauth.user.repository.UserRoleRepository;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -199,6 +200,16 @@ public class TenantService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public Page<TenantDto> getTenants(Integer page, Integer size){
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Tenant> tenants  = tenantRepository.findAll(pageable);
+
+        return tenants.map(this::dtoConstructor);
+    }
+
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
         return tenantName.toUpperCase()
@@ -206,4 +217,20 @@ public class TenantService {
                 .substring(0, Math.min(tenantName.length(), 6));
     }
 
+
+    private TenantDto dtoConstructor(Tenant tenant) {
+
+        if (tenant == null) {
+            return null;
+        }
+
+        TenantDto dto = new TenantDto();
+        dto.setId(tenant.getId());
+        dto.setTenantUuid(tenant.getTenantUuid());
+        dto.setTenantName(tenant.getTenantName());
+        dto.setTenantCode(tenant.getTenantCode());
+        dto.setIsActive(tenant.getIsActive());
+
+        return dto;
+    }
 }

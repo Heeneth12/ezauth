@@ -2,6 +2,8 @@ package com.ezh.ezauth.tenant.repository;
 
 import com.ezh.ezauth.common.entity.Application;
 import com.ezh.ezauth.tenant.entity.Tenant;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

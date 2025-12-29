@@ -2,12 +2,21 @@ package com.ezh.ezauth.tenant.controller;
 
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
+import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.utils.common.ResponseResource;
+import com.ezh.ezauth.utils.exception.CommonException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/tenant")
 @RequiredArgsConstructor
@@ -64,4 +73,12 @@ public class TenantController {
             );
         }
     }
+
+    @PostMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Page<TenantDto>> getAllUsers(@RequestParam Integer page, @RequestParam Integer size) throws CommonException {
+        log.info("Entered get all tenants details");
+        Page<TenantDto> response = tenantService.getTenants(page, size);
+        return ResponseResource.success(HttpStatus.OK, response, "All tenants fetched successfully");
+    }
+
 }
