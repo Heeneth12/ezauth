@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,25 +48,34 @@ public class UserService {
     private final PrivilegeRepository privilegeRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional(readOnly = true)
     public UserInitResponse getUserInitDetails(Long userId) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-        // map userApplications → DTO
+        // Validate user is active
+        if (!user.getIsActive()) {
+            throw new IllegalStateException("User account is inactive");
+        }
+
+        // Map userApplications → DTO
         Set<UserApplicationDto> applicationDtos = user.getUserApplications().stream()
+                .filter(UserApplication::getIsActive) // Only active applications
                 .map(ua -> UserApplicationDto.builder()
                         .id(ua.getId())
                         .appKey(ua.getApplication().getAppKey())
                         .appName(ua.getApplication().getAppName())
                         .isActive(ua.getIsActive())
-                        .modulePrivileges(groupModulePrivileges(ua))   // ✔ FIXED HERE
+                        .modulePrivileges(groupModulePrivileges(ua))
                         .build()
                 ).collect(Collectors.toSet());
 
-        // map userRoles → DTO
-        Set<String> roles = new HashSet<>(Set.of("TEST", "TEST_1"));
+        // Map userRoles → role names (get from actual database)
+        Set<String> roles = user.getUserRoles().stream()
+                .filter(UserRole::getIsActive)
+                .filter(ur -> ur.getExpiresAt() == null || ur.getExpiresAt().isAfter(LocalDateTime.now()))
+                .map(ur -> ur.getRole().getRoleKey()) // or getRoleName()
+                .collect(Collectors.toSet());
 
         return UserInitResponse.builder()
                 .id(user.getId())
@@ -474,25 +484,21 @@ public class UserService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Groups privileges by module key for a user application
+     * Uses existing loaded data to avoid N+1 queries
+     */
     private Map<String, Set<String>> groupModulePrivileges(UserApplication ua) {
 
-        Map<String, Set<String>> result = new HashMap<>();
-
-        ua.getModulePrivileges().forEach(ump -> {
-            String moduleKey = ump.getModule().getModuleKey();
-
-            // Fetch all privileges for this module & userApplication
-            Set<String> privileges = getPrivileges(
-                    ump.getModule().getId(),
-                    ump.getUserApplication().getId()
-            );
-
-            // Add to map (merge duplicates automatically)
-            result.computeIfAbsent(moduleKey, k -> new HashSet<>())
-                    .addAll(privileges);
-        });
-
-        return result;
+        return ua.getModulePrivileges().stream()
+                .filter(UserModulePrivilege::getIsActive) // Only active privileges
+                .collect(Collectors.groupingBy(
+                        ump -> ump.getModule().getModuleKey(), // Group by module key
+                        Collectors.mapping(
+                                ump -> ump.getPrivilege().getPrivilegeKey(), // Get privilege key
+                                Collectors.toSet() // Collect as Set (automatically handles duplicates)
+                        )
+                ));
     }
 
 }
