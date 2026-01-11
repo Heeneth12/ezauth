@@ -210,6 +210,95 @@ public class TenantService {
         return tenants.map(this::dtoConstructor);
     }
 
+
+    @Transactional
+    public User registerGoogleTenant(String email, String fullName, String pictureUrl, String appKey) {
+
+        if (userRepository.existsByEmail(email)) {
+            return userRepository.findByEmail(email).orElseThrow();
+        }
+
+        //Default App Key if missing (Adjust "EZH_CORE" to your actual default app key)
+        String targetAppKey = (appKey != null && !appKey.isEmpty()) ? appKey : "EZH_INV_001";
+
+        Application app = applicationRepository.findByAppKey(targetAppKey)
+                .orElseThrow(() -> new RuntimeException("Invalid application key for registration"));
+
+        // 3. Generate Codes
+        String tenantCode = generateTenantCode(fullName);
+        if (tenantRepository.existsByTenantCode(tenantCode)) {
+            tenantCode = tenantCode + "-" + System.currentTimeMillis();
+        }
+
+        // 4. Create Tenant
+        Tenant tenant = Tenant.builder()
+                .tenantName(fullName + "'s Workspace")
+                .tenantCode(tenantCode)
+                .applications(Set.of(app))
+                .isPersonal(true)
+                .isActive(true)
+                .build();
+        tenant = tenantRepository.save(tenant);
+
+        // 5. Create User (No Password)
+        User adminUser = User.builder()
+                .fullName(fullName)
+                .email(email)
+                .passwordHash(passwordEncoder.encode("GOOGLE_AUTH_USER"))
+                .isActive(true)
+                .tenant(tenant)
+                .build();
+        adminUser = userRepository.save(adminUser);
+
+        //Setup Access (UserApplication)
+        UserApplication userApplication = UserApplication.builder()
+                .user(adminUser)
+                .application(app)
+                .isActive(true)
+                .build();
+        userApplicationRepository.save(userApplication);
+        adminUser.setUserApplications(Set.of(userApplication));
+
+        //Assign Tenant Admin
+        tenant.setTenantAdmin(adminUser);
+        tenantRepository.save(tenant);
+
+        //Assign Privileges (Full Access for Personal Tenant)
+        List<Module> modules = moduleRepository.findByApplicationId(app.getId());
+        for (Module module : modules) {
+            for (Privilege privilege : module.getPrivileges()) {
+                UserModulePrivilege ump = UserModulePrivilege.builder()
+                        .userApplication(userApplication)
+                        .module(module)
+                        .privilege(privilege)
+                        .isActive(true)
+                        .build();
+                userModulePrivilegeRepository.save(ump);
+            }
+        }
+
+        //Create & Assign Super Admin Role
+        Role superAdminRole = Role.builder()
+                .roleName("Super Admin")
+                .roleKey("SUPER_ADMIN")
+                .description("System generated admin role")
+                .tenant(tenant)
+                .isActive(true)
+                .isSystemRole(true)
+                .build();
+        superAdminRole = roleRepository.save(superAdminRole);
+
+        UserRole userRole = UserRole.builder()
+                .user(adminUser)
+                .role(superAdminRole)
+                .isActive(true)
+                .build();
+        userRoleRepository.save(userRole);
+
+        log.info("Successfully auto-registered Google user: {}", email);
+        return adminUser;
+    }
+
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
         return tenantName.toUpperCase()

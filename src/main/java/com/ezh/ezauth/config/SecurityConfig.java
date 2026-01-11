@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/signin",
                                 "/api/v1/auth/refresh",
+                                "/api/v1/auth/google",
                                 "/api/v1/auth/activate/**"
                         ).permitAll()
                         .anyRequest().authenticated()
@@ -59,7 +60,8 @@ public class SecurityConfig {
                 "https://www.ez-hub.in",
                 "https://app.ez-hub.in",
                 "http://localhost:3000",
-                "http://localhost:4200"
+                "http://localhost:4200",
+                "http://localhost:8080"
         ));
 
         config.setAllowedMethods(List.of(

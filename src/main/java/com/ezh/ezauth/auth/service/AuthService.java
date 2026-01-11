@@ -2,15 +2,22 @@ package com.ezh.ezauth.auth.service;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.security.JwtTokenProvider;
+import com.ezh.ezauth.tenant.repository.TenantRepository;
+import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserInitResponse;
 import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
+import com.ezh.ezauth.utils.common.CommonResponse;
+import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
-import lombok.AllArgsConstructor;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,16 +25,26 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import java.util.Collections;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.util.Collections;
 
 @Slf4j
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final TenantService tenantService;
+
+    @Value("${google.client.id}")
+    private String googleClientId;
 
 
     @Transactional(readOnly = true)
@@ -117,4 +134,73 @@ public class AuthService {
         return userService.getUserInitDetails(userId);
     }
 
+    @Transactional(readOnly = true)
+    public CommonResponse validateToken(String token) throws CommonException {
+        log.info("Execution started: Validating access token integrity and expiration");
+
+        boolean isValid = jwtTokenProvider.validateToken(token);
+
+        //Explicitly handle invalid cases if no exception was thrown
+        if (!isValid) {
+            log.warn("Token validation failed: Invalid signature or expired");
+            throw new CommonException("Invalid or expired token", HttpStatus.UNAUTHORIZED);
+        }
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Token is valid")
+                .build();
+    }
+
+    @Transactional
+    public AuthResponse signInWithGoogle(GoogleSignInRequest request) throws CommonException {
+        try {
+            //Verify Google Token
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(request.getIdToken());
+
+            if (idToken == null) {
+                throw new CommonException("Invalid Google ID Token", HttpStatus.UNAUTHORIZED);
+            }
+
+            //Extract Info
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+            String pictureUrl = (String) payload.get("picture");
+
+            //Find OR Register User
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            if (user == null) {
+                user = tenantService.registerGoogleTenant(email, name, pictureUrl, request.getAppKey());
+            }
+
+            //Generate Tokens
+            String accessToken = jwtTokenProvider.generateAccessToken(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getTenant().getId()
+            );
+            String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .message("Google Sign-In Successful")
+                    .build();
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Google Sign-In failed", e);
+            throw new CommonException("Google Authentication Failed", HttpStatus.UNAUTHORIZED);
+        }
+    }
 }

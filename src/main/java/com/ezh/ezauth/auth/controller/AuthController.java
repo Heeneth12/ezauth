@@ -2,18 +2,22 @@ package com.ezh.ezauth.auth.controller;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.auth.service.AuthService;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserInitResponse;
+import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -57,5 +61,21 @@ public class AuthController {
         return ResponseResource.success(HttpStatus.OK, response, "Token refreshed successfully");
     }
 
+    @PostMapping(value = "/google", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<AuthResponse> signInWithGoogle(@Valid @RequestBody GoogleSignInRequest request) throws CommonException {
+        log.info("Entered Google Sign-In");
+        AuthResponse response = authService.signInWithGoogle(request);
+        return ResponseResource.success(HttpStatus.OK, response, "Google Sign-In successful");
+    }
 
+    @GetMapping(value = "/validate", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> validateToken(@RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) throws CommonException {
+        log.info("Entered validateToken check");
+        String token = bearerToken;
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            token = bearerToken.substring(7);
+        }
+        CommonResponse response = authService.validateToken(token);
+        return ResponseResource.success(HttpStatus.OK, response, "Token is valid");
+    }
 }
