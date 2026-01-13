@@ -6,7 +6,6 @@ import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.security.JwtTokenProvider;
-import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserInitResponse;
 import com.ezh.ezauth.user.entity.User;
@@ -19,6 +18,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -112,8 +112,18 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * CACHE IMPLEMENTATION:
+     * value = "userInitCache" -> The specific cache container to use
+     * key = "#token" -> The token acts as the unique ID for the data
+     * unless = "#result == null" -> Don't cache errors or nulls
+     */
     @Transactional(readOnly = true)
+    @Cacheable(value = "userInitCache", key = "#token", unless = "#result == null")
     public UserInitResponse initUser(String token) throws CommonException {
+
+        // This log only prints if the data was NOT found in cache (Cache Miss)
+        log.info("Fetching User Init Data from Database (Cache Miss)");
 
         if (token == null || token.isBlank()) {
             throw new CommonException("Token is missing", HttpStatus.BAD_REQUEST);
@@ -127,7 +137,6 @@ public class AuthService {
         try {
             userId = jwtTokenProvider.getUserIdFromToken(token);
         } catch (Exception e) {
-            // 401 – Unauthorized
             throw new CommonException("Invalid user information in token", HttpStatus.UNAUTHORIZED);
         }
 
