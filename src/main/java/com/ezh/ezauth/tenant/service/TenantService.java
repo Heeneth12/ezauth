@@ -1,6 +1,7 @@
 package com.ezh.ezauth.tenant.service;
 
 
+import com.ezh.ezauth.common.dto.ApplicationDto;
 import com.ezh.ezauth.common.entity.Application;
 import com.ezh.ezauth.common.entity.Module;
 import com.ezh.ezauth.common.entity.Privilege;
@@ -8,10 +9,11 @@ import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
-import com.ezh.ezauth.security.JwtTokenProvider;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
+import com.ezh.ezauth.tenant.entity.TenantAddress;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
+import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.entity.UserApplication;
 import com.ezh.ezauth.user.entity.UserModulePrivilege;
@@ -20,19 +22,22 @@ import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.UserRoleRepository;
+import com.ezh.ezauth.utils.common.CommonResponse;
+import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -48,7 +53,6 @@ public class TenantService {
     private final UserModulePrivilegeRepository userModulePrivilegeRepository;
     private final ModuleRepository moduleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
 
 
     @Transactional
@@ -78,6 +82,31 @@ public class TenantService {
                 .build();
 
         tenant = tenantRepository.save(tenant);
+
+        //ADD ADDRESS (NEW LOGIC)
+        if (request.getAddress() != null) {
+            TenantAddress tenantAddress = TenantAddress.builder()
+                    .tenant(tenant)
+                    .addressLine1(request.getAddress().getAddressLine1())
+                    .addressLine2(request.getAddress().getAddressLine2())
+                    .route(request.getAddress().getRoute())
+                    .area(request.getAddress().getArea())
+                    .city(request.getAddress().getCity())
+                    .state(request.getAddress().getState())
+                    .country(request.getAddress().getCountry())
+                    .pinCode(request.getAddress().getPinCode())
+                    .addressType(request.getAddress().getType())
+                    .build();
+
+            // Initialize set if null and add address
+            if (tenant.getAddresses() == null) {
+                tenant.setAddresses(new HashSet<>());
+            }
+            tenant.getAddresses().add(tenantAddress);
+
+            // Save tenant again to cascade the new address
+            tenant = tenantRepository.save(tenant);
+        }
 
         // 4. Create Admin User
         User adminUser = User.builder()
@@ -154,62 +183,52 @@ public class TenantService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
-    public TenantSignInResponse signIn(TenantSignInRequest request) throws CommonException {
+    @Transactional
+    public CommonResponse updateTenant(Long tenantId, TenantRegistrationRequest request) {
 
-        // 1. Find user by email
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
 
-        // 2. Check if user is active
-        if (!user.getIsActive()) {
-            throw new RuntimeException("User account is inactive");
+        if (request.getAdminPhone() != null && !request.getAdminPhone().isBlank()) {
+            User admin = tenant.getTenantAdmin();
+            if (admin != null) {
+                admin.setPhone(request.getAdminPhone());
+                userRepository.save(admin);
+            }
         }
 
-        // 3. Check if tenant is active
-        if (!user.getTenant().getIsActive()) {
-            throw new RuntimeException("Tenant account is inactive");
+        if (request.getAddress() != null) {
+            handleAddressUpdate(tenant, request.getAddress());
         }
 
-        // 4. Validate password
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid email or password");
-        }
+        tenantRepository.save(tenant);
 
-        // 5. If tenantCode is provided, validate it
-        if (request.getTenantCode() != null &&
-                !request.getTenantCode().isEmpty() &&
-                !user.getTenant().getTenantCode().equals(request.getTenantCode())) {
-            throw new RuntimeException("Invalid tenant code");
-        }
-
-        // 6. Check if user is tenant admin
-        Boolean isAdmin = user.getTenant().getTenantAdmin() != null &&
-                user.getTenant().getTenantAdmin().getId().equals(user.getId());
-
-        // 8. Return response
-        return TenantSignInResponse.builder()
-                .userId(user.getId())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .tenantId(user.getTenant().getId())
-                .tenantName(user.getTenant().getTenantName())
-                .tenantCode(user.getTenant().getTenantCode())
-                .isAdmin(isAdmin)
-                .message("Sign in successful")
+        return CommonResponse
+                .builder()
+                .status(Status.SUCCESS)
+                .message("Tenant successfully updated")
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public Page<TenantDto> getTenants(Integer page, Integer size){
+    public Page<TenantDto> getTenants(Integer page, Integer size) {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<Tenant> tenants  = tenantRepository.findAll(pageable);
+        Page<Tenant> tenants = tenantRepository.findAll(pageable);
 
         return tenants.map(this::dtoConstructor);
     }
 
+
+    @Transactional(readOnly = true)
+    public TenantDto getTenantById(Long tenantId) {
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+
+        return dtoConstructor(tenant);
+    }
 
     @Transactional
     public User registerGoogleTenant(String email, String fullName, String pictureUrl, String appKey) {
@@ -313,13 +332,109 @@ public class TenantService {
             return null;
         }
 
-        TenantDto dto = new TenantDto();
-        dto.setId(tenant.getId());
-        dto.setTenantUuid(tenant.getTenantUuid());
-        dto.setTenantName(tenant.getTenantName());
-        dto.setTenantCode(tenant.getTenantCode());
-        dto.setIsActive(tenant.getIsActive());
+        // Map TenantAddress Entity -> TenantAddressDto
+        Set<TenantAddressDto> addressDtos = null;
+        if (tenant.getAddresses() != null && !tenant.getAddresses().isEmpty()) {
+            addressDtos = tenant.getAddresses().stream()
+                    .map(addr -> TenantAddressDto.builder()
+                            .id(addr.getId())
+                            .addressLine1(addr.getAddressLine1())
+                            .addressLine2(addr.getAddressLine2())
+                            .route(addr.getRoute())
+                            .area(addr.getArea())
+                            .city(addr.getCity())
+                            .state(addr.getState())
+                            .country(addr.getCountry())
+                            .pinCode(addr.getPinCode())
+                            .type(addr.getAddressType())
+                            .build())
+                    .collect(Collectors.toSet());
+        }
 
-        return dto;
+        // Map Tenant Admin (User Entity -> UserDto)
+        UserDto adminDto = null;
+        if (tenant.getTenantAdmin() != null) {
+            adminDto = UserDto.builder()
+                    .id(tenant.getTenantAdmin().getId())
+                    .userUuid(tenant.getTenantAdmin().getUserUuid())
+                    .fullName(tenant.getTenantAdmin().getFullName())
+                    .email(tenant.getTenantAdmin().getEmail())
+                    .phone(tenant.getTenantAdmin().getPhone())
+                    .isActive(tenant.getTenantAdmin().getIsActive())
+                    .build();
+        }
+
+        // Map Applications (Application Entity -> ApplicationDto)
+        Set<ApplicationDto> applicationDtos = null;
+        if (tenant.getApplications() != null && !tenant.getApplications().isEmpty()) {
+            applicationDtos = tenant.getApplications().stream()
+                    .map(app -> ApplicationDto.builder()
+                            .id(app.getId())
+                            .appName(app.getAppName())
+                            .appKey(app.getAppKey())
+                            .description(app.getDescription())
+                            .isActive(app.getIsActive())
+                            .build())
+                    .collect(Collectors.toSet());
+        }
+
+        // Build and Return TenantDto
+        return TenantDto.builder()
+                .id(tenant.getId())
+                .tenantUuid(tenant.getTenantUuid())
+                .tenantName(tenant.getTenantName())
+                .tenantCode(tenant.getTenantCode())
+                .email(adminDto.getEmail())
+                .phone(adminDto.getPhone())
+                .isActive(tenant.getIsActive())
+                .tenantAdmin(adminDto)
+                .applications(applicationDtos)
+                .tenantAddress(addressDtos)
+                .build();
+    }
+
+
+    /**
+     * Helper to handle Address Upsert (Update if exists, Insert if new)
+     */
+    private void handleAddressUpdate(Tenant tenant, TenantAddressDto addressDto) {
+        if (tenant.getAddresses() == null) {
+            tenant.setAddresses(new HashSet<>());
+        }
+
+        // Logic: Try to find an address to update
+        // Priority 1: Find by ID (if provided)
+        // Priority 2: Find by Address Type (if no ID provided, e.g., update the "OFFICE" address)
+        TenantAddress existingAddress = tenant.getAddresses().stream()
+                .filter(a -> (addressDto.getId() != null && a.getId().equals(addressDto.getId())) ||
+                        (a.getAddressType() == addressDto.getType()))
+                .findFirst()
+                .orElse(null);
+
+        if (existingAddress != null) {
+            // UPDATE existing address
+            existingAddress.setAddressLine1(addressDto.getAddressLine1());
+            existingAddress.setAddressLine2(addressDto.getAddressLine2());
+            existingAddress.setCity(addressDto.getCity());
+            existingAddress.setState(addressDto.getState());
+            existingAddress.setCountry(addressDto.getCountry());
+            existingAddress.setPinCode(addressDto.getPinCode());
+            // We don't change the Type if we found it by Type, but safe to set it
+            existingAddress.setAddressType(addressDto.getType());
+        } else {
+            // CREATE new address
+            TenantAddress newAddress = TenantAddress.builder()
+                    .tenant(tenant)
+                    .addressLine1(addressDto.getAddressLine1())
+                    .addressLine2(addressDto.getAddressLine2())
+                    .city(addressDto.getCity())
+                    .state(addressDto.getState())
+                    .country(addressDto.getCountry())
+                    .pinCode(addressDto.getPinCode())
+                    .addressType(addressDto.getType())
+                    .build();
+
+            tenant.getAddresses().add(newAddress);
+        }
     }
 }

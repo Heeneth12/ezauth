@@ -34,4 +34,6 @@ public class TenantRegistrationRequest {
 
     @NotNull(message = "Application key is required")
     private String appKey;
+
+    private TenantAddressDto address;
 }

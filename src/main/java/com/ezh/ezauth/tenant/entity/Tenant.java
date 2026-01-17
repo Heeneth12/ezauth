@@ -61,6 +61,9 @@ public class Tenant {
     )
     private Set<Application> applications;
 
+    @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TenantAddress> addresses;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
