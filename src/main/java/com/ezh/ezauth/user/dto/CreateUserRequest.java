@@ -31,4 +31,5 @@ public class CreateUserRequest {
     private Set<Long> roleIds;
     private Set<Long> applicationIds;
     private List<PrivilegeAssignRequest> privilegeMapping;
+    private Set<UserAddressDto> address;
 }

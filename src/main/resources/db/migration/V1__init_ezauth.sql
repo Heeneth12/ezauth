@@ -6,6 +6,8 @@ DROP TABLE IF EXISTS user_module_privileges CASCADE;
 DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS user_applications CASCADE;
 DROP TABLE IF EXISTS tenant_applications CASCADE;
+DROP TABLE IF EXISTS user_address CASCADE;   -- ADDED
+DROP TABLE IF EXISTS tenant_address CASCADE; -- ADDED
 DROP TABLE IF EXISTS privileges CASCADE;
 DROP TABLE IF EXISTS modules CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
@@ -29,10 +31,8 @@ CREATE TABLE tenants (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Add comment
 COMMENT ON TABLE tenants IS 'Multi-tenant isolation - each tenant represents an organization';
 COMMENT ON COLUMN tenants.tenant_uuid IS 'Unique identifier for external references';
-COMMENT ON COLUMN tenants.is_personal IS 'Flag to identify personal vs organizational tenants';
 
 -- =========================
 -- 2. APPLICATIONS TABLE
@@ -48,7 +48,6 @@ CREATE TABLE applications (
 );
 
 COMMENT ON TABLE applications IS 'Defines available applications in the system';
-COMMENT ON COLUMN applications.app_key IS 'Unique application identifier key';
 
 -- =========================
 -- 3. MODULES TABLE
@@ -67,9 +66,6 @@ CREATE TABLE modules (
         REFERENCES applications(id) ON DELETE CASCADE
 );
 
-COMMENT ON TABLE modules IS 'Modules within each application';
-COMMENT ON COLUMN modules.module_key IS 'Unique key for module within application scope';
-
 -- =========================
 -- 4. PRIVILEGES TABLE
 -- =========================
@@ -84,9 +80,6 @@ CREATE TABLE privileges (
     CONSTRAINT fk_privilege_module FOREIGN KEY (module_id)
         REFERENCES modules(id) ON DELETE CASCADE
 );
-
-COMMENT ON TABLE privileges IS 'Granular permissions within each module';
-COMMENT ON COLUMN privileges.privilege_key IS 'Action key like VIEW, CREATE, UPDATE, DELETE';
 
 -- =========================
 -- 5. USERS TABLE
@@ -107,7 +100,6 @@ CREATE TABLE users (
 );
 
 COMMENT ON TABLE users IS 'System users belonging to tenants';
-COMMENT ON COLUMN users.user_uuid IS 'External UUID for API responses';
 
 -- =========================
 -- 6. ROLES TABLE
@@ -127,9 +119,6 @@ CREATE TABLE roles (
         REFERENCES tenants(id) ON DELETE CASCADE
 );
 
-COMMENT ON TABLE roles IS 'Tenant-specific roles for grouping privileges';
-COMMENT ON COLUMN roles.is_system_role IS 'Flag for predefined system roles';
-
 -- =========================
 -- 7. USER_APPLICATIONS TABLE
 -- =========================
@@ -145,8 +134,6 @@ CREATE TABLE user_applications (
     CONSTRAINT fk_ua_application FOREIGN KEY (application_id)
         REFERENCES applications(id) ON DELETE CASCADE
 );
-
-COMMENT ON TABLE user_applications IS 'Maps which applications a user has access to';
 
 -- =========================
 -- 8. USER_ROLES TABLE
@@ -164,9 +151,6 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_ur_role FOREIGN KEY (role_id)
         REFERENCES roles(id) ON DELETE CASCADE
 );
-
-COMMENT ON TABLE user_roles IS 'Assigns roles to users with optional expiration';
-COMMENT ON COLUMN user_roles.expires_at IS 'Optional expiration timestamp for temporary role assignments';
 
 -- =========================
 -- 9. USER_MODULE_PRIVILEGES TABLE
@@ -186,8 +170,6 @@ CREATE TABLE user_module_privileges (
         REFERENCES privileges(id) ON DELETE CASCADE
 );
 
-COMMENT ON TABLE user_module_privileges IS 'Direct privilege assignments to users (overrides role privileges)';
-
 -- =========================
 -- 10. TENANT_APPLICATIONS TABLE
 -- =========================
@@ -201,7 +183,54 @@ CREATE TABLE tenant_applications (
         REFERENCES applications(id) ON DELETE CASCADE
 );
 
-COMMENT ON TABLE tenant_applications IS 'Defines which applications are available to each tenant';
+-- =========================
+-- 11. TENANT ADDRESS TABLE (ADDED)
+-- =========================
+CREATE TABLE tenant_address (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    route VARCHAR(100),
+    area VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    country VARCHAR(100),
+    pin_code VARCHAR(20),
+    address_type VARCHAR(50) NOT NULL, -- Enum: HEAD_OFFICE, BILLING, etc.
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tenant_addr_tenant FOREIGN KEY (tenant_id)
+        REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+COMMENT ON TABLE tenant_address IS 'Stores official addresses for the tenant organization';
+
+-- =========================
+-- 12. USER ADDRESS TABLE (ADDED)
+-- =========================
+CREATE TABLE user_address (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL, -- Kept for data partitioning
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    route VARCHAR(100),
+    area VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    country VARCHAR(100),
+    pin_code VARCHAR(20),
+    address_type VARCHAR(50) NOT NULL, -- Enum: HOME, SHIPPING, etc.
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_addr_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_addr_tenant FOREIGN KEY (tenant_id)
+        REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+COMMENT ON TABLE user_address IS 'Stores personal addresses for individual users';
 
 
 CREATE TABLE flyway_test (
@@ -209,19 +238,15 @@ CREATE TABLE flyway_test (
     name VARCHAR(50)
 );
 
-
-
 -- =========================
--- 11. ADD CIRCULAR FOREIGN KEY
+-- 13. ADD CIRCULAR FOREIGN KEY
 -- =========================
 ALTER TABLE tenants
 ADD CONSTRAINT fk_tenant_admin FOREIGN KEY (tenant_admin_user_id)
     REFERENCES users(id) ON DELETE SET NULL;
 
-COMMENT ON COLUMN tenants.tenant_admin_user_id IS 'Primary administrator user for the tenant';
-
 -- =========================
--- 12. CREATE INDEXES
+-- 14. CREATE INDEXES
 -- =========================
 
 -- Users indexes
@@ -248,15 +273,16 @@ CREATE INDEX idx_user_applications_is_active ON user_applications(is_active);
 -- User Roles indexes
 CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
 CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
-CREATE INDEX idx_user_roles_is_active ON user_roles(is_active);
-CREATE INDEX idx_user_roles_expires_at ON user_roles(expires_at) WHERE expires_at IS NOT NULL;
 
 -- User Module Privileges indexes
-CREATE INDEX idx_user_module_privileges_user_app_id ON user_module_privileges(user_application_id);
-CREATE INDEX idx_user_module_privileges_module_id ON user_module_privileges(module_id);
-CREATE INDEX idx_user_module_privileges_privilege_id ON user_module_privileges(privilege_id);
-CREATE INDEX idx_user_module_privileges_is_active ON user_module_privileges(is_active);
+CREATE INDEX idx_user_module_privileges_ua_id ON user_module_privileges(user_application_id);
 
 -- Tenant Applications indexes
 CREATE INDEX idx_tenant_applications_tenant_id ON tenant_applications(tenant_id);
-CREATE INDEX idx_tenant_applications_application_id ON tenant_applications(application_id);
+
+-- Tenant Address indexes (ADDED)
+CREATE INDEX idx_tenant_address_tenant_id ON tenant_address(tenant_id);
+
+-- User Address indexes (ADDED)
+CREATE INDEX idx_user_address_user_id ON user_address(user_id);
+CREATE INDEX idx_user_address_tenant_id ON user_address(tenant_id);

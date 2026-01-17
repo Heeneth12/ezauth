@@ -2,13 +2,14 @@ package com.ezh.ezauth.user.controller;
 
 import com.ezh.ezauth.user.dto.CreateUserRequest;
 import com.ezh.ezauth.user.dto.UserDto;
-import com.ezh.ezauth.user.dto.UserEditResponse;
+import com.ezh.ezauth.user.dto.UserFilter;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -31,17 +32,18 @@ public class UserController {
         return ResponseResource.success(HttpStatus.CREATED, response, "User created successfully");
     }
 
-    @GetMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<List<UserDto>> getAllUsers() throws CommonException {
+    @PostMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Page<UserDto>> getAllUsers(@RequestParam Integer page, @RequestParam Integer size,
+                                                       @RequestBody UserFilter filter) throws CommonException {
         log.info("Entered get all users details");
-        List<UserDto> response = userService.getAllUsers();
+        Page<UserDto> response = userService.getAllUsers(filter, page, size);
         return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
     }
 
     @GetMapping(value = "/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<UserEditResponse> getUserById(@PathVariable Long userId) throws CommonException {
+    public ResponseResource<UserDto> getUserById(@PathVariable Long userId) throws CommonException {
         log.info("Fetching user with ID: {}", userId);
-        UserEditResponse response = userService.getUserForEdit(userId);
+        UserDto response = userService.getUserById(userId, true);
         return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
     }
 
@@ -51,11 +53,11 @@ public class UserController {
         CommonResponse response = userService.updateUser(userId, request);
         return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");
     }
-//
-//    @DeleteMapping(value = "/delete/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
-//    public ResponseResource<CommonResponse> deleteUser(@PathVariable Long userId) throws CommonException {
-//        log.info("Deleting user with ID: {}", userId);
-//        userService.deleteUser(userId);
-//        return ResponseResource.success(HttpStatus.OK, null, "User deleted successfully");
-//    }
+
+    @PostMapping(value = "/delete/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteUser(@PathVariable Long userId) throws CommonException {
+        log.info("Deleting user with ID: {}", userId);
+        CommonResponse  response =  userService.softDeleteUserById(userId);
+        return ResponseResource.success(HttpStatus.OK, null, "User deleted successfully");
+    }
 }

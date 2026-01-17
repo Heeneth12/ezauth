@@ -11,5 +11,6 @@ import lombok.*;
 public class UserRoleDto {
     private Long id;
     private String roleKey;
+    private String roleName;
     private Long roleId;
 }
