@@ -22,6 +22,7 @@ import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.UserRoleRepository;
+import com.ezh.ezauth.utils.EmailService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -53,6 +54,7 @@ public class TenantService {
     private final UserModulePrivilegeRepository userModulePrivilegeRepository;
     private final ModuleRepository moduleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
 
     @Transactional
@@ -171,6 +173,7 @@ public class TenantService {
                 .build();
 
         userRoleRepository.save(userRole);
+        emailService.sendWelcomeEmail(request.getAdminEmail(), request.getTenantName());
 
         // 9. Return response
         return TenantRegistrationResponse.builder()
@@ -313,7 +316,7 @@ public class TenantService {
                 .isActive(true)
                 .build();
         userRoleRepository.save(userRole);
-
+        emailService.sendWelcomeEmail(email, fullName);
         log.info("Successfully auto-registered Google user: {}", email);
         return adminUser;
     }
