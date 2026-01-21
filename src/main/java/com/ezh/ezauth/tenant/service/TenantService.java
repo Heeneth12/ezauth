@@ -9,6 +9,11 @@ import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
+import com.ezh.ezauth.subscription.entity.Subscription;
+import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
+import com.ezh.ezauth.subscription.entity.SubscriptionStatus;
+import com.ezh.ezauth.subscription.repository.SubscriptionPlanRepository;
+import com.ezh.ezauth.subscription.repository.SubscriptionRepository;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.entity.TenantAddress;
@@ -35,6 +40,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,6 +61,8 @@ public class TenantService {
     private final ModuleRepository moduleRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
 
     @Transactional
@@ -84,6 +92,25 @@ public class TenantService {
                 .build();
 
         tenant = tenantRepository.save(tenant);
+
+        SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
+                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        //Create the Subscription object
+        Subscription subscription = Subscription.builder()
+                .tenant(tenant)
+                .plan(defaultPlan)
+                .status(SubscriptionStatus.ACTIVE)
+                .startDate(now)
+                .endDate(now.plusDays(defaultPlan.getDurationDays()))
+                .autoRenew(false)
+                .build();
+
+        subscription = subscriptionRepository.save(subscription);
+        tenant.setCurrentSubscription(subscription);
+        tenantRepository.save(tenant);
 
         //ADD ADDRESS (NEW LOGIC)
         if (request.getAddress() != null) {
@@ -261,6 +288,23 @@ public class TenantService {
                 .isActive(true)
                 .build();
         tenant = tenantRepository.save(tenant);
+
+        SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
+                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+        //Create the Subscription object
+        Subscription subscription = Subscription.builder()
+                .tenant(tenant)
+                .plan(defaultPlan)
+                .status(SubscriptionStatus.ACTIVE)
+                .startDate(now)
+                .endDate(now.plusDays(defaultPlan.getDurationDays()))
+                .autoRenew(false)
+                .build();
+
+        subscription = subscriptionRepository.save(subscription);
+        tenant.setCurrentSubscription(subscription);
 
         // 5. Create User (No Password)
         User adminUser = User.builder()

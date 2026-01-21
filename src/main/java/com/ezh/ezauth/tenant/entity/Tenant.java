@@ -3,6 +3,7 @@ package com.ezh.ezauth.tenant.entity;
 
 import com.ezh.ezauth.common.entity.Application;
 import com.ezh.ezauth.common.entity.Role;
+import com.ezh.ezauth.subscription.entity.Subscription;
 import com.ezh.ezauth.user.entity.User;
 
 import jakarta.persistence.*;
@@ -46,6 +47,10 @@ public class Tenant {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_admin_user_id")
     private User tenantAdmin;
+
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "current_subscription_id")
+    private Subscription currentSubscription;
 
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL)
     private Set<User> users;
