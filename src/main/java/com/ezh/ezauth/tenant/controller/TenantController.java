@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -55,6 +56,13 @@ public class TenantController {
         log.info("Entered get all tenants details");
         Page<TenantDto> response = tenantService.getTenants(page, size);
         return ResponseResource.success(HttpStatus.OK, response, "All tenants fetched successfully");
+    }
+
+    @GetMapping(value = "/bulk", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Map<Long, TenantDto>> getBulkTenants(@RequestParam List<Long> uuids) throws CommonException {
+        log.info("Entered get bulk tenants details");
+        Map<Long, TenantDto> response = tenantService.getTenantsByIds(uuids);
+        return ResponseResource.success(HttpStatus.OK, response, "Bulk tenants fetched successfully");
     }
 
     @PostMapping(value = "/{tenantId}/update", produces = MediaType.APPLICATION_JSON_VALUE)

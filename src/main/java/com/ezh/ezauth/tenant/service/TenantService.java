@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -258,6 +259,19 @@ public class TenantService {
                 .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
 
         return dtoConstructor(tenant);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, TenantDto> getTenantsByIds(List<Long> tenantIds) throws CommonException {
+        log.info("Fetching bulk data for {} tenant IDs", tenantIds.size());
+
+        List<Tenant> tenants = tenantRepository.findByIdIn(tenantIds);
+
+        return tenants.stream()
+                .collect(Collectors.toMap(
+                        Tenant::getId,
+                        this::dtoConstructor
+                ));
     }
 
     @Transactional
