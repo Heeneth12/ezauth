@@ -59,9 +59,9 @@ public class TenantController {
     }
 
     @GetMapping(value = "/bulk", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<Map<Long, TenantDto>> getBulkTenants(@RequestParam List<Long> uuids) throws CommonException {
+    public ResponseResource<Map<Long, TenantDto>> getBulkTenants(@RequestParam("ids") List<Long> ids) throws CommonException {
         log.info("Entered get bulk tenants details");
-        Map<Long, TenantDto> response = tenantService.getTenantsByIds(uuids);
+        Map<Long, TenantDto> response = tenantService.getTenantsByIds(ids);
         return ResponseResource.success(HttpStatus.OK, response, "Bulk tenants fetched successfully");
     }
 

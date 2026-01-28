@@ -41,10 +41,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -262,15 +260,25 @@ public class TenantService {
     }
 
     @Transactional(readOnly = true)
-    public Map<Long, TenantDto> getTenantsByIds(List<Long> tenantIds) throws CommonException {
-        log.info("Fetching bulk data for {} tenant IDs", tenantIds.size());
+    public Map<Long, TenantDto> getTenantsByIds(List<Long> tenantIds) {
 
-        List<Tenant> tenants = tenantRepository.findByIdIn(tenantIds);
+        if (tenantIds == null || tenantIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Set<Long> uniqueIds = new HashSet<>(tenantIds);
+
+        log.info("Fetching bulk data for {} unique tenant IDs", uniqueIds.size());
+
+        List<Tenant> tenants = tenantRepository.findByIdIn(uniqueIds.stream().toList());
 
         return tenants.stream()
+                .map(this::dtoConstructor)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(
-                        Tenant::getId,
-                        this::dtoConstructor
+                        TenantDto::getId,
+                        Function.identity(),
+                        (existing, duplicate) -> existing
                 ));
     }
 
@@ -445,8 +453,8 @@ public class TenantService {
                 .tenantUuid(tenant.getTenantUuid())
                 .tenantName(tenant.getTenantName())
                 .tenantCode(tenant.getTenantCode())
-                .email(adminDto.getEmail())
-                .phone(adminDto.getPhone())
+                .email(adminDto != null ? adminDto.getEmail() : null)
+                .phone(adminDto != null ? adminDto.getPhone() : null)
                 .isActive(tenant.getIsActive())
                 .tenantAdmin(adminDto)
                 .applications(applicationDtos)

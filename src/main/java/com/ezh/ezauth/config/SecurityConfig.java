@@ -60,6 +60,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "https://www.ez-hub.in",
                 "https://app.ez-hub.in",
+                "https://ez-inventory.onrender.com",
+                "http://localhost:8085",
                 "http://localhost:3000",
                 "http://localhost:4200",
                 "http://localhost:8080"
