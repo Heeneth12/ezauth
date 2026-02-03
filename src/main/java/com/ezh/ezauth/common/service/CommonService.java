@@ -66,7 +66,8 @@ public class CommonService {
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() throws CommonException {
         log.info("Fetching all roles");
-        List<Role> roles = roleRepository.findAll();
+        Long tenantId = UserContextUtil.getTenantId();
+        List<Role> roles = roleRepository.findByTenantId(tenantId);
 
         if (roles.isEmpty()) {
             log.warn("No roles found in the system");
