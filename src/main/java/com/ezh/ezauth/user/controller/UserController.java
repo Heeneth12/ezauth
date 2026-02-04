@@ -14,8 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/user")
@@ -54,10 +52,10 @@ public class UserController {
         return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");
     }
 
-    @PostMapping(value = "/delete/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> deleteUser(@PathVariable Long userId) throws CommonException {
+    @PutMapping(value = "/{userId}/toggle-status", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> toggleUserStatus(@PathVariable Long userId) throws CommonException {
         log.info("Deleting user with ID: {}", userId);
-        CommonResponse  response =  userService.softDeleteUserById(userId);
-        return ResponseResource.success(HttpStatus.OK, null, "User deleted successfully");
+        CommonResponse response =  userService.toggleUserStatus(userId);
+        return ResponseResource.success(HttpStatus.OK, response, "User deleted successfully");
     }
 }

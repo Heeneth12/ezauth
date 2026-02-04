@@ -12,7 +12,6 @@ import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.*;
 import com.ezh.ezauth.user.entity.*;
-import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
@@ -20,6 +19,7 @@ import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -121,6 +121,7 @@ public class UserService {
     }
 
     @Transactional
+    @CacheEvict(value = "userInitCache", key = "#userId")
     public CommonResponse updateUser(Long userId, CreateUserRequest request) throws CommonException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
@@ -253,18 +254,31 @@ public class UserService {
     }
 
     @Transactional
-    public CommonResponse softDeleteUserById(Long userId) throws CommonException {
+    @CacheEvict(value = "userInitCache", key = "#userId")
+    public CommonResponse toggleUserStatus(Long userId) throws CommonException {
         Long tenantId = UserContextUtil.getTenantId();
         User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
-        user.setIsActive(false);
+        // Prevent toggling SUPER_ADMIN status
+        boolean isSuperAdmin = user.getUserRoles().stream()
+                .anyMatch(userRole -> "SUPER_ADMIN".equals(userRole.getRole().getRoleKey()));
+
+        if (isSuperAdmin){
+            return CommonResponse.builder()
+                    .id(user.getId().toString())
+                    .status(Status.FAILURE)
+                    .message("Cannot change status of SUPER_ADMIN user")
+                    .build();
+        }
+
+        user.setIsActive(!user.getIsActive());
         userRepository.save(user);
 
         return CommonResponse.builder()
                 .id(user.getId().toString())
                 .status(Status.SUCCESS)
-                .message("User soft deleted successfully")
+                .message("User status toggled successfully, current status: " + (user.getIsActive() ? "Active" : "Inactive"))
                 .build();
     }
 

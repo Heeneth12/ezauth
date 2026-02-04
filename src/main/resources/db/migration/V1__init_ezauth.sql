@@ -1,3 +1,6 @@
+CREATE SCHEMA IF NOT EXISTS auth;
+SET search_path TO auth;
+
 -- ==========================================================
 -- 1. DROP EXISTING TABLES (CLEAN SLATE)
 -- ==========================================================

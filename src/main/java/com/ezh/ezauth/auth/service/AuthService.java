@@ -115,11 +115,11 @@ public class AuthService {
     /**
      * CACHE IMPLEMENTATION:
      * value = "userInitCache" -> The specific cache container to use
-     * key = "#token" -> The token acts as the unique ID for the data
+     * key = SpEL expression -> Extracts userId from token for cache key
      * unless = "#result == null" -> Don't cache errors or nulls
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "userInitCache", key = "#token", unless = "#result == null")
+    @Cacheable(value = "userInitCache", key = "@jwtTokenProvider.getUserIdFromToken(#token)", unless = "#result == null")
     public UserInitResponse initUser(String token) throws CommonException {
 
         // This log only prints if the data was NOT found in cache (Cache Miss)
@@ -133,6 +133,7 @@ public class AuthService {
             throw new CommonException("Invalid or expired token", HttpStatus.UNAUTHORIZED);
         }
 
+        // Extract userId from token first for cache key
         Long userId;
         try {
             userId = jwtTokenProvider.getUserIdFromToken(token);
