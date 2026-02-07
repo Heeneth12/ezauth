@@ -317,6 +317,9 @@ INSERT INTO privileges (privilege_name, privilege_key, module_id) VALUES
 ('View Settings', 'EZH_INV_SETTINGS_VIEW', 11),
 ('Update Settings', 'EZH_INV_SETTINGS_EDIT', 11);
 
+-- ITEMS
+('View Purchase Request', 'EZH_INV_PRQ_VIEW', 12);
+
 
 -- ==========================================================
 -- 9. SEED DEFAULT PLANS

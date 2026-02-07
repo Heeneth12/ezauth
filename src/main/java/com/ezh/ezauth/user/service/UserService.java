@@ -46,6 +46,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PrivilegeRepository privilegeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserTypeConfigService userTypeConfigService;
 
     public UserInitResponse getUserInitDetails(Long userId) {
         User user = userRepository.findById(userId)
@@ -107,6 +108,9 @@ public class UserService {
                 .addresses(new HashSet<>())
                 .build();
 
+        // Apply user type defaults if applicable
+        applyUserTypeDefaults(user, request, tenant);
+
         // Delegate to sync methods
         syncUserRoles(user, request.getRoleIds());
         syncUserApplications(user, request.getApplicationIds());
@@ -166,6 +170,7 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
+                .userType(user.getUserType().toString())
                 .tenantId(user.getTenant().getId());
 
         // 3. Basic Role Keys (Set<String>)
@@ -472,6 +477,7 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
+                .userType(user.getUserType().toString())
                 .roles(user.getUserRoles().stream()
                         .map(ur -> ur.getRole().getRoleKey())
                         .collect(Collectors.toSet()))
@@ -488,5 +494,143 @@ public class UserService {
                                 Collectors.toSet()
                         )
                 ));
+    }
+
+    /**
+     * Apply user type-specific defaults to the request.
+     * If enforceDefaults is true, always applies defaults regardless of request data.
+     * Otherwise, merges request data with defaults (request data takes precedence).
+     */
+    private void applyUserTypeDefaults(User user, CreateUserRequest request, Tenant tenant) {
+        UserType userType = request.getUserType();
+
+        // Only apply defaults if user type has configured defaults
+        if (!userTypeConfigService.hasDefaults(userType)) {
+            log.debug("No defaults configured for user type: {}", userType);
+            return;
+        }
+
+        boolean enforceDefaults = userTypeConfigService.shouldEnforceDefaults(userType);
+        log.info("Applying default configuration for user type: {} (enforceDefaults={})", userType, enforceDefaults);
+
+        // Apply role defaults
+        if (enforceDefaults || request.getRoleIds() == null || request.getRoleIds().isEmpty()) {
+            Set<String> defaultRoleKeys = userTypeConfigService.getDefaultRoleKeys(userType);
+            Set<Long> roleIds = resolveRoleIds(defaultRoleKeys, tenant);
+            request.setRoleIds(roleIds);
+            log.info("Applied default roles for {}: {} (enforced={})", userType, defaultRoleKeys, enforceDefaults);
+        }
+
+        // Apply application defaults
+        if (enforceDefaults || request.getApplicationIds() == null || request.getApplicationIds().isEmpty()) {
+            Set<String> defaultAppKeys = userTypeConfigService.getDefaultApplicationKeys(userType);
+            Set<Long> appIds = resolveApplicationIds(defaultAppKeys);
+            request.setApplicationIds(appIds);
+            log.info("Applied default applications for {}: {} (enforced={})", userType, defaultAppKeys, enforceDefaults);
+        }
+
+        // Apply privilege defaults
+        if (enforceDefaults || request.getPrivilegeMapping() == null || request.getPrivilegeMapping().isEmpty()) {
+            List<PrivilegeAssignRequest> privilegeMappings = resolvePrivilegeMappings(userType);
+            request.setPrivilegeMapping(privilegeMappings);
+            log.info("Applied default privileges for {} (enforced={})", userType, enforceDefaults);
+        }
+    }
+
+    /**
+     * Resolve role keys to role IDs. Creates ADMIN role if it doesn't exist.
+     */
+    private Set<Long> resolveRoleIds(Set<String> roleKeys, Tenant tenant) {
+        Set<Long> roleIds = new HashSet<>();
+
+        for (String roleKey : roleKeys) {
+            Role role = roleRepository.findByRoleKeyAndTenantId(roleKey, tenant.getId())
+                    .orElseGet(() -> {
+                        // Create ADMIN role if it doesn't exist
+                        if ("ADMIN".equals(roleKey)) {
+                            log.info("ADMIN role not found for tenant {}. Creating it.", tenant.getId());
+                            Role newRole = Role.builder()
+                                    .roleKey("ADMIN")
+                                    .roleName("Administrator")
+                                    .description("Default administrator role")
+                                    .tenant(tenant)
+                                    .isActive(true)
+                                    .isSystemRole(false)
+                                    .build();
+                            return roleRepository.save(newRole);
+                        } else {
+                            log.warn("Role with key '{}' not found for tenant {}", roleKey, tenant.getId());
+                            return null;
+                        }
+                    });
+
+            if (role != null) {
+                roleIds.add(role.getId());
+            }
+        }
+
+        return roleIds;
+    }
+
+    /**
+     * Resolve application keys to application IDs
+     */
+    private Set<Long> resolveApplicationIds(Set<String> appKeys) {
+        Set<Long> appIds = new HashSet<>();
+
+        for (String appKey : appKeys) {
+            Application app = applicationRepository.findByAppKey(appKey)
+                    .orElse(null);
+
+            if (app != null) {
+                appIds.add(app.getId());
+            } else {
+                log.warn("Application with key '{}' not found", appKey);
+            }
+        }
+
+        return appIds;
+    }
+
+    /**
+     * Resolve privilege configurations to PrivilegeAssignRequest list
+     */
+    private List<PrivilegeAssignRequest> resolvePrivilegeMappings(UserType userType) {
+        List<PrivilegeAssignRequest> mappings = new ArrayList<>();
+        List<UserTypeConfigService.PrivilegeConfig> configs = userTypeConfigService.getDefaultPrivilegeConfigs(userType);
+
+        for (UserTypeConfigService.PrivilegeConfig config : configs) {
+            // Find module by key
+            Module module = moduleRepository.findByModuleKey(config.getModuleKey())
+                    .orElse(null);
+
+            if (module == null) {
+                log.warn("Module with key '{}' not found", config.getModuleKey());
+                continue;
+            }
+
+            // Find privileges by keys
+            List<Long> privilegeIds = new ArrayList<>();
+            for (String privKey : config.getPrivilegeKeys()) {
+                Privilege privilege = privilegeRepository.findByPrivilegeKeyAndModuleId(privKey, module.getId())
+                        .orElse(null);
+
+                if (privilege != null) {
+                    privilegeIds.add(privilege.getId());
+                } else {
+                    log.warn("Privilege with key '{}' not found for module {}", privKey, module.getModuleKey());
+                }
+            }
+
+            if (!privilegeIds.isEmpty()) {
+                PrivilegeAssignRequest request = new PrivilegeAssignRequest();
+                request.setApplicationId(module.getApplication().getId());
+                request.setModuleId(module.getId());
+                request.setPrivilegeIds(new HashSet<>(privilegeIds));
+                mappings.add(request);
+            }
+        }
+
+        return mappings;
     }
 }

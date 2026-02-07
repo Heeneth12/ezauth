@@ -18,6 +18,7 @@ public class UserDto {
     private String email;
     private String phone;
     private Boolean isActive;
+    private String userType;
     private Set<String> roles;
     private List<UserRoleDto> userRoles;
     private Set<Long> applicationIds;
