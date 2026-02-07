@@ -16,6 +16,9 @@ public class UserInitResponse {
     private String fullName;
     private String email;
     private String phone;
+    private String userType;
+
+    @Builder.Default
     private Boolean isActive = true;
     private long tenantId;
     private String tenantName;

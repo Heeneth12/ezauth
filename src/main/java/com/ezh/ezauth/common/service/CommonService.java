@@ -14,6 +14,7 @@ import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.security.JwtTokenProvider;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
+import com.ezh.ezauth.user.entity.UserType;
 import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -180,4 +182,9 @@ public class CommonService {
                 .build();
     }
 
+    public List<String> getUserTypes() {
+        return Arrays.stream(UserType.values())
+                .map(Enum::name)
+                .toList();
+    }
 }

@@ -39,6 +39,11 @@ public class User {
     @Column(name = "phone")
     private String phone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_type", nullable = false, length = 50)
+    private UserType userType;
+
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

@@ -44,6 +44,13 @@ public class CommonController {
         return ResponseResource.success(HttpStatus.CREATED, response, "Role created successfully");
     }
 
+    @GetMapping(value = "/user-types", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<String>> getUserTypes() throws CommonException {
+        log.info("Entered get user types");
+        List<String> response = commonService.getUserTypes();
+        return ResponseResource.success(HttpStatus.OK, response, "User types fetched successfully");
+    }
+
     @GetMapping(value = "/apps/{appId}/modules", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<?> getModulesByApplication(@PathVariable Long appId) throws CommonException{
         log.info("Entered get modules for appId: {}", appId);

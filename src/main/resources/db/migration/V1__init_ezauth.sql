@@ -83,6 +83,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
+    user_type VARCHAR(50) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT true,
     tenant_id BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -253,7 +254,8 @@ INSERT INTO modules (id, module_name, module_key, application_id) VALUES
 (8, 'Reports', 'EZH_INV_REPORTS', 1),
 (9, 'Documents', 'EZH_INV_DOCUMENTS', 1),
 (10, 'Admin', 'EZH_INV_USER_MGMT', 1),
-(11, 'Settings', 'EZH_INV_SETTINGS', 1);
+(11, 'Settings', 'EZH_INV_SETTINGS', 1)
+(12, 'Vendor Management', 'EZH_INV_VENDOR', 1);
 
 -- 3. INSERT PRIVILEGES
 INSERT INTO privileges (privilege_name, privilege_key, module_id) VALUES
