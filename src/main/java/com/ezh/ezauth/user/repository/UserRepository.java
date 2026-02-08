@@ -1,6 +1,7 @@
 package com.ezh.ezauth.user.repository;
 
 import com.ezh.ezauth.user.entity.User;
+import com.ezh.ezauth.user.entity.UserType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,6 +30,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 AND (:userUuid IS NULL OR u.userUuid = :userUuid)
                 AND (:email IS NULL OR LOWER(u.email) = :email)
                 AND (:phone IS NULL OR u.phone = :phone)
+                AND (:userType IS NULL OR u.userType IN :userType)
+                AND (:isActive IS NULL OR u.isActive = :isActive)
                 AND (
                     :search IS NULL OR
                     LOWER(u.fullName) LIKE CONCAT('%', CAST(:search AS string), '%') OR
@@ -43,6 +46,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("email") String email,
             @Param("phone") String phone,
             @Param("search") String search,
+            @Param("userType") List<UserType> userTypes,
+            @Param("isActive") Boolean isActive,
             Pageable pageable
     );
 }

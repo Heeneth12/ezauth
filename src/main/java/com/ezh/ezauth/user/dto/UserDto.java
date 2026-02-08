@@ -22,7 +22,7 @@ public class UserDto {
     private Set<String> roles;
     private List<UserRoleDto> userRoles;
     private Set<Long> applicationIds;
-    private Set<UserAddressDto> userAddress;
+    private Set<UserAddressDto> addresses;
     private List<UserAppEditDto> userApplications;
 
     @Getter

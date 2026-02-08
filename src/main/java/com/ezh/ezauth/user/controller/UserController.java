@@ -58,4 +58,11 @@ public class UserController {
         CommonResponse response =  userService.toggleUserStatus(userId);
         return ResponseResource.success(HttpStatus.OK, response, "User deleted successfully");
     }
+
+    @PostMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Page<UserDto>> searchUsers(@RequestBody UserFilter filter) throws CommonException {
+        log.info("Entered get all users details");
+        Page<UserDto> response = userService.searchUsers(filter);
+        return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
+    }
 }

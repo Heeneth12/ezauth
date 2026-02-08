@@ -199,7 +199,7 @@ public class UserService {
 
             // B. Addresses
             if (user.getAddresses() != null) {
-                dtoBuilder.userAddress(user.getAddresses().stream()
+                dtoBuilder.addresses(user.getAddresses().stream()
                         .map(this::mapToAddressDto) // Assuming mapToAddressDto exists in your service
                         .collect(Collectors.toSet()));
             }
@@ -255,9 +255,12 @@ public class UserService {
         Long userId = (filter != null) ? filter.getUserId() : null;
         String userUuid = (filter != null) ? filter.getUserUuid() : null;
         String phone = (filter != null) ? filter.getPhone() : null;
+        List<UserType> userTypes = (filter != null) ? filter.getUserType() : null;
+        Boolean isActive = (filter != null) ? filter.getIsActive() : null;
 
-        return userRepository.findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, pageable)
-                .map(this::constructUserDto);
+        return userRepository
+                .findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
+                .map(dto -> constructUserDto(dto, false)); // false for basic details only
     }
 
     @Transactional
@@ -468,8 +471,18 @@ public class UserService {
                 .build();
     }
 
-    private UserDto constructUserDto(User user) {
+    private UserDto constructUserDto(User user, boolean sendAddressDetails) {
         if (user == null) return null;
+
+        Set<UserAddressDto> userAddresses = null;
+
+        if (sendAddressDetails) {
+            userAddresses = user.getAddresses()
+                    .stream()
+                    .map(this::mapToAddressDto)
+                    .collect(Collectors.toSet());
+        }
+
         return UserDto.builder()
                 .id(user.getId())
                 .userUuid(user.getUserUuid())
@@ -478,6 +491,7 @@ public class UserService {
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
                 .userType(user.getUserType().toString())
+                .addresses(userAddresses)
                 .roles(user.getUserRoles().stream()
                         .map(ur -> ur.getRole().getRoleKey())
                         .collect(Collectors.toSet()))
@@ -632,5 +646,22 @@ public class UserService {
         }
 
         return mappings;
+    }
+
+    public Page<UserDto> searchUsers(UserFilter filter) {
+        Pageable pageable = Pageable.unpaged();
+
+        String email = (filter != null && StringUtils.hasText(filter.getEmail())) ? filter.getEmail().trim().toLowerCase() : null;
+        String search = (filter != null && StringUtils.hasText(filter.getSearchQuery())) ? filter.getSearchQuery().trim().toLowerCase() : null;
+        Long tenantId = (filter != null) ? filter.getTenantId() : null;
+        Long userId = (filter != null) ? filter.getUserId() : null;
+        String userUuid = (filter != null) ? filter.getUserUuid() : null;
+        String phone = (filter != null) ? filter.getPhone() : null;
+        List<UserType> userTypes = (filter != null) ? filter.getUserType() : null;
+        Boolean isActive = (filter != null) ? filter.getIsActive() : null;
+
+        return userRepository
+                .findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
+                .map(dto -> constructUserDto(dto, true)); // true for full details
     }
 }
