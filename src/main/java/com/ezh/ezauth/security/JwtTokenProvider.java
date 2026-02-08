@@ -27,9 +27,9 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Generate Access Token
+     * Generate Access Token with user type and roles
      */
-    public String generateAccessToken(Long userId, String email, Long tenantId) {
+    public String generateAccessToken(Long userId, String email, Long tenantId, String userType, String roles) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
@@ -38,6 +38,8 @@ public class JwtTokenProvider {
                 .addClaims(Map.of(
                         "email", email,
                         "tenantId", String.valueOf(tenantId),
+                        "userType", userType != null ? userType : "",
+                        "roles", roles != null ? roles : "",
                         "type", "ACCESS"
                 ))
                 .setIssuedAt(now)
@@ -111,6 +113,14 @@ public class JwtTokenProvider {
         } catch (JwtException e) {
             return false;
         }
+    }
+
+    public String getUserTypeFromToken(String token) {
+        return getClaims(token).get("userType", String.class);
+    }
+
+    public String getRolesFromToken(String token) {
+        return getClaims(token).get("roles", String.class);
     }
 
     private Claims getClaims(String token) {

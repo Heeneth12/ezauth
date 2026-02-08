@@ -9,6 +9,7 @@ import com.ezh.ezauth.security.JwtTokenProvider;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserInitResponse;
 import com.ezh.ezauth.user.entity.User;
+import com.ezh.ezauth.user.entity.UserRole;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.common.CommonResponse;
@@ -61,11 +62,16 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // Extract roles as comma-separated string
+        String roles = extractUserRoles(user);
+
         // Generate tokens
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
-                user.getTenant().getId()
+                user.getTenant().getId(),
+                user.getUserType().name(),
+                roles
         );
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
@@ -95,11 +101,16 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // Extract roles as comma-separated string
+        String roles = extractUserRoles(user);
+
         // Generate new access token
         String newAccessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
-                user.getTenant().getId()
+                user.getTenant().getId(),
+                user.getUserType().name(),
+                roles
         );
 
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
@@ -191,11 +202,16 @@ public class AuthService {
                 user = tenantService.registerGoogleTenant(email, name, pictureUrl, request.getAppKey());
             }
 
+            // Extract roles as comma-separated string
+            String roles = extractUserRoles(user);
+
             //Generate Tokens
             String accessToken = jwtTokenProvider.generateAccessToken(
                     user.getId(),
                     user.getEmail(),
-                    user.getTenant().getId()
+                    user.getTenant().getId(),
+                    user.getUserType().name(),
+                    roles
             );
             String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
@@ -212,5 +228,21 @@ public class AuthService {
             log.error("Google Sign-In failed", e);
             throw new CommonException("Google Authentication Failed", HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    /**
+     * Extract active user roles as comma-separated string
+     * @param user User entity with roles
+     * @return Comma-separated role keys (e.g., "ADMIN,VIEWER") or empty string
+     */
+    private String extractUserRoles(User user) {
+        if (user.getUserRoles() == null) {
+            return "";
+        }
+        return user.getUserRoles().stream()
+                .filter(UserRole::getIsActive)
+                .map(ur -> ur.getRole().getRoleKey())
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
     }
 }
