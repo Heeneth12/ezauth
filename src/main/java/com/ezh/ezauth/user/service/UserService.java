@@ -174,6 +174,8 @@ public class UserService {
                         .userType(p.getUserType())
                         .UserUuid(p.getUserUuid())
                         .name(p.getFullName())
+                        .email(p.getEmail())
+                        .phone(p.getPhone())
                         .build(),
                 (existing, replacement) -> existing
         ));

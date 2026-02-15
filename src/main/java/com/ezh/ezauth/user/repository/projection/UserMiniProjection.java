@@ -5,4 +5,6 @@ public interface UserMiniProjection {
     String getUserType();
     String getUserUuid();
     String getFullName();
+    String getEmail();
+    String getPhone();
 }

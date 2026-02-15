@@ -26,8 +26,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Boolean existsByEmail(String email);
 
     @Query(value = """
-            SELECT u.id, u.user_type as userType, u.user_uuid as userUuid, u.full_name as fullName 
-            FROM users u WHERE u.id IN (:userIds)
+            SELECT 
+                u.id, 
+                u.user_type as userType, 
+                u.user_uuid as userUuid, 
+                u.full_name as fullName,
+                u.email as email,
+                u.phone as phone
+            FROM users u 
+            WHERE u.id IN (:userIds)
             """, nativeQuery = true)
     List<UserMiniProjection> findUserMini(@Param("userIds") List<Long> userIds);
 

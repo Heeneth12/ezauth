@@ -14,11 +14,6 @@ public class UserMiniDto {
     private String userType;
     private String UserUuid;
     private String name;
-
-    public UserMiniDto(UserMiniDto userMini){
-        this.id = userMini.getId();
-        this.userType = userMini.getUserType();
-        this.UserUuid = userMini.getUserUuid();
-        this.name = userMini.getName();
-    }
+    private String email;
+    private String phone;
 }
