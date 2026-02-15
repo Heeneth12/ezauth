@@ -84,6 +84,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     user_type VARCHAR(50) NOT NULL,
+    is_login_enabled NOT NULL DEFAULT true,
     is_active BOOLEAN NOT NULL DEFAULT true,
     tenant_id BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

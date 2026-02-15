@@ -13,6 +13,7 @@ import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.*;
 import com.ezh.ezauth.user.entity.*;
 import com.ezh.ezauth.user.repository.UserRepository;
+import com.ezh.ezauth.user.repository.projection.UserMiniProjection;
 import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
@@ -94,6 +95,8 @@ public class UserService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Invalid tenant", HttpStatus.BAD_REQUEST));
 
+        boolean isLoginEnabled = !request.getUserType().equals(UserType.CUSTOMER);
+
         User user = User.builder()
                 .userUuid(UUID.randomUUID().toString())
                 .fullName(request.getFullName())
@@ -101,6 +104,7 @@ public class UserService {
                 .phone(request.getPhone())
                 .isActive(true)
                 .userType(request.getUserType())
+                .isLoginEnabled(isLoginEnabled)
                 .tenant(tenant)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .userRoles(new HashSet<>())
@@ -114,7 +118,9 @@ public class UserService {
         // Delegate to sync methods
         syncUserRoles(user, request.getRoleIds());
         syncUserApplications(user, request.getApplicationIds());
-        syncUserPrivileges(user, request.getPrivilegeMapping());
+        if (!isLoginEnabled) {
+            syncUserPrivileges(user, request.getPrivilegeMapping());
+        }
         syncUserAddresses(user, request.getAddress());
 
         User savedUser = userRepository.save(user);
@@ -152,6 +158,25 @@ public class UserService {
                 .message("User successfully updated")
                 .status(Status.SUCCESS)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, UserMiniDto> getUsersMiniByIds(List<Long> userIds) throws CommonException {
+        List<UserMiniProjection> projections = userRepository.findUserMini(userIds);
+
+        if (projections.isEmpty()) {
+            throw new CommonException("Users not found", HttpStatus.NOT_FOUND);
+        }
+        return projections.stream().collect(Collectors.toMap(
+                UserMiniProjection::getId,
+                p -> UserMiniDto.builder()
+                        .id(p.getId())
+                        .userType(p.getUserType())
+                        .UserUuid(p.getUserUuid())
+                        .name(p.getFullName())
+                        .build(),
+                (existing, replacement) -> existing
+        ));
     }
 
     @Transactional(readOnly = true)

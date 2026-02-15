@@ -44,6 +44,10 @@ public class User {
     private UserType userType;
 
     @Builder.Default
+    @Column(name = "is_login_enabled", nullable = false)
+    private Boolean isLoginEnabled = true;
+
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

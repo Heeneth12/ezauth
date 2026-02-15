@@ -1,7 +1,9 @@
 package com.ezh.ezauth.user.repository;
 
+import com.ezh.ezauth.user.dto.UserMiniDto;
 import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.entity.UserType;
+import com.ezh.ezauth.user.repository.projection.UserMiniProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +24,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByTenant_Id(Long tenantId);
 
     Boolean existsByEmail(String email);
+
+    @Query(value = """
+            SELECT u.id, u.user_type as userType, u.user_uuid as userUuid, u.full_name as fullName 
+            FROM users u WHERE u.id IN (:userIds)
+            """, nativeQuery = true)
+    List<UserMiniProjection> findUserMini(@Param("userIds") List<Long> userIds);
 
     @Query("""
                 SELECT u FROM User u
