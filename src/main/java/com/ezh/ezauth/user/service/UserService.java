@@ -117,10 +117,13 @@ public class UserService {
 
         // Delegate to sync methods
         syncUserRoles(user, request.getRoleIds());
+
         syncUserApplications(user, request.getApplicationIds());
-        if (!isLoginEnabled) {
+
+        if (isLoginEnabled) {
             syncUserPrivileges(user, request.getPrivilegeMapping());
         }
+
         syncUserAddresses(user, request.getAddress());
 
         User savedUser = userRepository.save(user);
@@ -165,8 +168,9 @@ public class UserService {
         List<UserMiniProjection> projections = userRepository.findUserMini(userIds);
 
         if (projections.isEmpty()) {
-            throw new CommonException("Users not found", HttpStatus.NOT_FOUND);
+            return Collections.emptyMap();
         }
+
         return projections.stream().collect(Collectors.toMap(
                 UserMiniProjection::getId,
                 p -> UserMiniDto.builder()
