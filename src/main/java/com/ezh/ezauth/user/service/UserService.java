@@ -20,6 +20,8 @@ import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +50,7 @@ public class UserService {
     private final PrivilegeRepository privilegeRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserTypeConfigService userTypeConfigService;
+    private final CacheManager cacheManager;
 
     public UserInitResponse getUserInitDetails(Long userId) {
         User user = userRepository.findById(userId)
@@ -165,24 +168,53 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Map<Long, UserMiniDto> getUsersMiniByIds(List<Long> userIds) throws CommonException {
-        List<UserMiniProjection> projections = userRepository.findUserMini(userIds);
-
-        if (projections.isEmpty()) {
+        if (userIds == null || userIds.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        return projections.stream().collect(Collectors.toMap(
-                UserMiniProjection::getId,
-                p -> UserMiniDto.builder()
+        // Initialize variables
+        Cache cache = cacheManager.getCache("userMiniCache");
+        Map<Long, UserMiniDto> resultMap = new HashMap<>();
+        List<Long> missingIds = new ArrayList<>();
+
+        // 2. Check the cache for each individual User ID
+        for (Long id : userIds) {
+            UserMiniDto cachedUser = null;
+            if (cache != null) {
+                cachedUser = cache.get(id, UserMiniDto.class);
+            }
+
+            if (cachedUser != null) {
+                resultMap.put(id, cachedUser); // Cache hit
+            } else {
+                missingIds.add(id); // Cache miss, we need to fetch this from DB
+            }
+        }
+
+        // Fetch ONLY the missing users from the database
+        if (!missingIds.isEmpty()) {
+            List<UserMiniProjection> projections = userRepository.findUserMini(missingIds);
+
+            for (UserMiniProjection p : projections) {
+                UserMiniDto dto = UserMiniDto.builder()
                         .id(p.getId())
                         .userType(p.getUserType())
                         .UserUuid(p.getUserUuid())
                         .name(p.getFullName())
                         .email(p.getEmail())
                         .phone(p.getPhone())
-                        .build(),
-                (existing, replacement) -> existing
-        ));
+                        .build();
+
+                // Add to our final result
+                resultMap.put(dto.getId(), dto);
+
+                // Put the newly fetched user into the cache for next time
+                if (cache != null) {
+                    cache.put(dto.getId(), dto);
+                }
+            }
+        }
+        return resultMap;
     }
 
     @Transactional(readOnly = true)
