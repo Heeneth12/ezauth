@@ -17,6 +17,8 @@ import com.ezh.ezauth.subscription.repository.SubscriptionRepository;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.entity.TenantAddress;
+import com.ezh.ezauth.tenant.entity.TenantDetails;
+import com.ezh.ezauth.tenant.repository.TenantDetailsRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.entity.User;
@@ -36,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +65,7 @@ public class TenantService {
     private final EmailService emailService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final TenantDetailsRepository detailsRepository;
 
 
     @Transactional
@@ -91,6 +95,15 @@ public class TenantService {
                 .build();
 
         tenant = tenantRepository.save(tenant);
+
+        TenantDetails tenantDetails = TenantDetails.builder()
+                .tenant(tenant)
+                .businessType(request.getBusinessType())
+                .baseCurrency("INR")
+                .timeZone("Asia/Kolkata")
+                .legalName(request.getTenantName())
+                .build();
+        detailsRepository.save(tenantDetails);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
                 .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
@@ -387,6 +400,65 @@ public class TenantService {
         return adminUser;
     }
 
+
+    @Transactional
+    public CommonResponse createTenantDetails(Long tenantId, TenantDetailsDto dto) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        // Check if details already exist to prevent duplicates
+        if (tenant.getTenantDetails() != null) {
+            throw new CommonException("Business details already exist for tenant: " + tenant.getTenantName(), HttpStatus.CONFLICT);
+        }
+
+        TenantDetails details = mapDtoToEntity(dto);
+        details.setTenant(tenant);
+
+        TenantDetails saved = detailsRepository.save(details);
+
+        return CommonResponse.builder()
+                .id(saved.getId().toString())
+                .message("Business details successfully initialized for tenant: " + tenant.getTenantName())
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+
+    @Transactional
+    public CommonResponse updateTenantDetails(Long tenantId, TenantDetailsDto dto) throws CommonException {
+        TenantDetails details = detailsRepository.findByTenantId(tenantId)
+                .orElseThrow(() -> new CommonException("Business details not found for the requested tenant", HttpStatus.NOT_FOUND));
+
+        // Update fields
+        details.setLegalName(dto.getLegalName());
+        details.setBusinessType(dto.getBusinessType());
+        details.setBaseCurrency(dto.getBaseCurrency());
+        details.setTimeZone(dto.getTimeZone());
+        details.setGstNumber(dto.getGstNumber());
+        details.setPanNumber(dto.getPanNumber());
+        details.setSupportEmail(dto.getSupportEmail());
+        details.setContactPhone(dto.getContactPhone());
+        details.setWebsite(dto.getWebsite());
+        details.setLogoUrl(dto.getLogoUrl());
+
+        TenantDetails updated = detailsRepository.save(details);
+
+        return CommonResponse.builder()
+                .id(updated.getId().toString())
+                .message("Business profile for '" + updated.getLegalName() + "' has been updated successfully.")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+
+    @Transactional(readOnly = true)
+    public TenantDetailsDto getTenantDetailsByTenantId(Long tenantId) throws CommonException {
+        // We fetch by tenantId directly using the repository method
+        return detailsRepository.findByTenantId(tenantId)
+                .map(this::mapEntityToDto)
+                .orElseThrow(() -> new CommonException("No business details found for Tenant ID: " + tenantId, HttpStatus.NOT_FOUND));
+    }
+
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
         return tenantName.toUpperCase()
@@ -505,5 +577,36 @@ public class TenantService {
 
             tenant.getAddresses().add(newAddress);
         }
+    }
+
+
+    private TenantDetails mapDtoToEntity(TenantDetailsDto dto) {
+        return TenantDetails.builder()
+                .legalName(dto.getLegalName())
+                .businessType(dto.getBusinessType())
+                .baseCurrency(dto.getBaseCurrency())
+                .timeZone(dto.getTimeZone())
+                .gstNumber(dto.getGstNumber())
+                .panNumber(dto.getPanNumber())
+                .supportEmail(dto.getSupportEmail())
+                .contactPhone(dto.getContactPhone())
+                .website(dto.getWebsite())
+                .logoUrl(dto.getLogoUrl())
+                .build();
+    }
+
+    private TenantDetailsDto mapEntityToDto(TenantDetails entity) {
+        return TenantDetailsDto.builder()
+                .legalName(entity.getLegalName())
+                .businessType(entity.getBusinessType())
+                .baseCurrency(entity.getBaseCurrency())
+                .timeZone(entity.getTimeZone())
+                .gstNumber(entity.getGstNumber())
+                .panNumber(entity.getPanNumber())
+                .supportEmail(entity.getSupportEmail())
+                .contactPhone(entity.getContactPhone())
+                .website(entity.getWebsite())
+                .logoUrl(entity.getLogoUrl())
+                .build();
     }
 }

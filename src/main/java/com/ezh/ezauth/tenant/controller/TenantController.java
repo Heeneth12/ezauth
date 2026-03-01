@@ -26,34 +26,9 @@ public class TenantController {
 
     private final TenantService tenantService;
 
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse> registerTenant(
-            @Valid @RequestBody TenantRegistrationRequest request) {
-
-        try {
-            TenantRegistrationResponse response = tenantService.registerTenant(request);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.builder()
-                            .success(true)
-                            .message("Tenant registered successfully")
-                            .data(response)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
-    }
-
     @PostMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<Page<TenantDto>> getAllUsers(@RequestParam Integer page, @RequestParam Integer size) throws CommonException {
-        log.info("Entered get all tenants details");
+    public ResponseResource<Page<TenantDto>> getAllTenants(@RequestParam Integer page, @RequestParam Integer size) throws CommonException {
+        log.info("Entered get all tenants details with filter");
         Page<TenantDto> response = tenantService.getTenants(page, size);
         return ResponseResource.success(HttpStatus.OK, response, "All tenants fetched successfully");
     }
@@ -66,10 +41,10 @@ public class TenantController {
     }
 
     @PostMapping(value = "/{tenantId}/update", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> getAllUsers(@PathVariable Long tenantId, @RequestBody TenantRegistrationRequest request) throws CommonException {
-        log.info("Entered get all tenants details");
+    public ResponseResource<CommonResponse> updateTenant(@PathVariable Long tenantId, @RequestBody TenantRegistrationRequest request) throws CommonException {
+        log.info("Entered updateTenant details with : {}", request);
         CommonResponse response = tenantService.updateTenant(tenantId, request);
-        return ResponseResource.success(HttpStatus.OK, response, "All tenants fetched successfully");
+        return ResponseResource.success(HttpStatus.OK, response, "Tenants updated successfully");
     }
 
     @GetMapping(value = "/{tenantId}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -77,6 +52,31 @@ public class TenantController {
         log.info("Fetching tenant details for ID: {}", tenantId);
         TenantDto response = tenantService.getTenantById(tenantId);
         return ResponseResource.success(HttpStatus.OK, response, "Tenant details fetched successfully");
+    }
+
+    @PostMapping(value = "/{tenantId}/details", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createTenantDetails(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody TenantDetailsDto request) throws CommonException {
+        log.info("Creating business details for tenant ID: {}", tenantId);
+        CommonResponse response = tenantService.createTenantDetails(tenantId, request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Tenant business details created successfully");
+    }
+
+    @PutMapping(value = "/{tenantId}/details", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateTenantDetails(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody TenantDetailsDto request) throws CommonException {
+        log.info("Updating business details for tenant ID: {}", tenantId);
+        CommonResponse response = tenantService.updateTenantDetails(tenantId, request);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant business details updated successfully");
+    }
+
+    @GetMapping(value = "/{tenantId}/details", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<TenantDetailsDto> getTenantDetails(@PathVariable Long tenantId) throws CommonException {
+        log.info("Fetching business details for tenant ID: {}", tenantId);
+        TenantDetailsDto response = tenantService.getTenantDetailsByTenantId(tenantId);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant business details fetched successfully");
     }
 
 }

@@ -36,6 +36,28 @@ CREATE TABLE tenants (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE tenant_details (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    business_type VARCHAR(50) NOT NULL,
+    legal_name VARCHAR(255) NOT NULL,
+    base_currency VARCHAR(3) NOT NULL,
+    time_zone VARCHAR(100) NOT NULL,
+    gst_number VARCHAR(255),
+    pan_number VARCHAR(255),
+    support_email VARCHAR(255),
+    contact_phone VARCHAR(255),
+    logo_url VARCHAR(255),
+    website VARCHAR(255),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT uk_tenant_details_tenant UNIQUE (tenant_id),
+    CONSTRAINT uk_tenant_details_gst UNIQUE (gst_number),
+    CONSTRAINT fk_tenant_details_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
+);
+
 CREATE TABLE applications (
     id BIGSERIAL PRIMARY KEY,
     app_name VARCHAR(255) NOT NULL,

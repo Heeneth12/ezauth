@@ -1,6 +1,7 @@
 package com.ezh.ezauth.tenant.dto;
 
 
+import com.ezh.ezauth.tenant.entity.BusinessType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +25,9 @@ public class TenantRegistrationRequest {
     @NotBlank(message = "Admin email is required")
     @Email(message = "Invalid email format")
     private String adminEmail;
+
+    @NotBlank(message = "Business Type is required")
+    private BusinessType businessType;
 
     @NotBlank(message = "Password is required")
     @Size(min = 8, message = "Password must be at least 8 characters")

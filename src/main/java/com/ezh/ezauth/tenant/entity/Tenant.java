@@ -58,6 +58,9 @@ public class Tenant {
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL)
     private Set<Role> roles;
 
+    @OneToOne(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private TenantDetails tenantDetails;
+
     @ManyToMany
     @JoinTable(
             name = "tenant_applications",
