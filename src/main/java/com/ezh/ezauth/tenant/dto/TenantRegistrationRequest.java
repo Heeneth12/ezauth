@@ -26,7 +26,7 @@ public class TenantRegistrationRequest {
     @Email(message = "Invalid email format")
     private String adminEmail;
 
-    @NotBlank(message = "Business Type is required")
+    @NotNull(message = "Business Type is required")
     private BusinessType businessType;
 
     @NotBlank(message = "Password is required")
