@@ -2,7 +2,6 @@ package com.ezh.ezauth.tenant.controller;
 
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
-import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -12,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -77,6 +75,25 @@ public class TenantController {
         log.info("Fetching business details for tenant ID: {}", tenantId);
         TenantDetailsDto response = tenantService.getTenantDetailsByTenantId(tenantId);
         return ResponseResource.success(HttpStatus.OK, response, "Tenant business details fetched successfully");
+    }
+
+    @PostMapping(value = "/{tenantId}/address", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createTenantAddress(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody TenantAddressDto request) throws CommonException {
+        log.info("Creating address for tenant ID: {}", tenantId);
+        CommonResponse response = tenantService.createTenantAddress(tenantId, request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Tenant address created successfully");
+    }
+
+    @PutMapping(value = "/{tenantId}/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateTenantAddress(
+            @PathVariable Long tenantId,
+            @PathVariable Long addressId,
+            @Valid @RequestBody TenantAddressDto request) throws CommonException {
+        log.info("Updating address {} for tenant ID: {}", addressId, tenantId);
+        CommonResponse response = tenantService.updateTenantAddress(tenantId, addressId, request);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant address updated successfully");
     }
 
 }
