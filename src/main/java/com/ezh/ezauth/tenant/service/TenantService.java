@@ -459,6 +459,86 @@ public class TenantService {
                 .orElseThrow(() -> new CommonException("No business details found for Tenant ID: " + tenantId, HttpStatus.NOT_FOUND));
     }
 
+    @Transactional
+    public CommonResponse createTenantAddress(Long tenantId, TenantAddressDto dto) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (tenant.getAddresses() == null) {
+            tenant.setAddresses(new HashSet<>());
+        }
+
+        boolean addressTypeExists = tenant.getAddresses().stream()
+                .anyMatch(address -> address.getAddressType() == dto.getType());
+
+        if (addressTypeExists) {
+            throw new CommonException("Address already exists for type: " + dto.getType(), HttpStatus.CONFLICT);
+        }
+
+        TenantAddress address = TenantAddress.builder()
+                .tenant(tenant)
+                .addressLine1(dto.getAddressLine1())
+                .addressLine2(dto.getAddressLine2())
+                .route(dto.getRoute())
+                .area(dto.getArea())
+                .city(dto.getCity())
+                .state(dto.getState())
+                .country(dto.getCountry())
+                .pinCode(dto.getPinCode())
+                .addressType(dto.getType())
+                .build();
+
+        tenant.getAddresses().add(address);
+        tenantRepository.save(tenant);
+
+        return CommonResponse.builder()
+                .id(String.valueOf(address.getId()))
+                .message("Tenant address created successfully")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse updateTenantAddress(Long tenantId, Long addressId, TenantAddressDto dto) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (tenant.getAddresses() == null || tenant.getAddresses().isEmpty()) {
+            throw new CommonException("No addresses found for this tenant", HttpStatus.NOT_FOUND);
+        }
+
+        TenantAddress address = tenant.getAddresses().stream()
+                .filter(item -> item.getId().equals(addressId))
+                .findFirst()
+                .orElseThrow(() -> new CommonException("Address not found for this tenant", HttpStatus.NOT_FOUND));
+
+        boolean duplicateType = tenant.getAddresses().stream()
+                .filter(item -> !item.getId().equals(addressId))
+                .anyMatch(item -> item.getAddressType() == dto.getType());
+
+        if (duplicateType) {
+            throw new CommonException("Address already exists for type: " + dto.getType(), HttpStatus.CONFLICT);
+        }
+
+        address.setAddressLine1(dto.getAddressLine1());
+        address.setAddressLine2(dto.getAddressLine2());
+        address.setRoute(dto.getRoute());
+        address.setArea(dto.getArea());
+        address.setCity(dto.getCity());
+        address.setState(dto.getState());
+        address.setCountry(dto.getCountry());
+        address.setPinCode(dto.getPinCode());
+        address.setAddressType(dto.getType());
+
+        tenantRepository.save(tenant);
+
+        return CommonResponse.builder()
+                .id(String.valueOf(address.getId()))
+                .message("Tenant address updated successfully")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
         return tenantName.toUpperCase()
