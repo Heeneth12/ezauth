@@ -4,6 +4,7 @@ import com.ezh.ezauth.user.dto.CreateUserRequest;
 import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.dto.UserFilter;
 import com.ezh.ezauth.user.dto.UserMiniDto;
+import com.ezh.ezauth.user.dto.UserAddressDto;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
@@ -75,5 +76,19 @@ public class UserController {
         log.info("Entered get all users details");
         Page<UserDto> response = userService.searchUsers(filter);
         return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
+    }
+
+    @PostMapping(value = "/{userId}/address", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> addUserAddress(@PathVariable Long userId, @RequestBody UserAddressDto request) throws CommonException {
+        log.info("Adding address for user with ID: {}", userId);
+        CommonResponse response = userService.addUserAddress(userId, request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "User address created successfully");
+    }
+
+    @PutMapping(value = "/{userId}/address/{addressId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateUserAddress(@PathVariable Long userId, @PathVariable Long addressId, @RequestBody UserAddressDto request) throws CommonException {
+        log.info("Updating address for user with ID: {} and addressId: {}", userId, addressId);
+        CommonResponse response = userService.updateUserAddress(userId, addressId, request);
+        return ResponseResource.success(HttpStatus.OK, response, "User address updated successfully");
     }
 }

@@ -611,6 +611,7 @@ public class TenantService {
                 .tenantAdmin(adminDto)
                 .applications(applicationDtos)
                 .tenantAddress(addressDtos)
+                .tenantDetails(mapEntityToDto(tenant.getTenantDetails()))
                 .build();
     }
 

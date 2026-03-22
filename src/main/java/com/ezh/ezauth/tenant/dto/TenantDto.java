@@ -23,4 +23,5 @@ public class TenantDto {
     private UserDto tenantAdmin;
     private Set<ApplicationDto> applications;
     private Set<TenantAddressDto> tenantAddress;
+    private TenantDetailsDto tenantDetails;
 }

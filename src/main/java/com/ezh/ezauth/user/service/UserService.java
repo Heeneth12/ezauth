@@ -355,6 +355,54 @@ public class UserService {
                 .build();
     }
 
+    @Transactional
+    @CacheEvict(value = "userInitCache", key = "#userId")
+    public CommonResponse addUserAddress(Long userId, UserAddressDto request) throws CommonException {
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getAddresses() == null) {
+            user.setAddresses(new HashSet<>());
+        }
+        
+        UserAddress newAddress = mapToAddressEntity(request, user, user.getTenant());
+        user.getAddresses().add(newAddress);
+        userRepository.save(user);
+
+        return CommonResponse.builder()
+                .id(user.getId().toString())
+                .message("User address successfully added")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+    @Transactional
+    @CacheEvict(value = "userInitCache", key = "#userId")
+    public CommonResponse updateUserAddress(Long userId, Long addressId, UserAddressDto request) throws CommonException {
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getAddresses() == null) {
+            throw new CommonException("Address not found", HttpStatus.NOT_FOUND);
+        }
+
+        UserAddress addressToUpdate = user.getAddresses().stream()
+                .filter(a -> a.getId() != null && a.getId().equals(addressId))
+                .findFirst()
+                .orElseThrow(() -> new CommonException("Address not found", HttpStatus.NOT_FOUND));
+
+        updateAddressEntity(addressToUpdate, request);
+        userRepository.save(user);
+
+        return CommonResponse.builder()
+                .id(user.getId().toString())
+                .message("User address successfully updated")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
     /**
      * Syncs Roles: Removes unselected, Adds new ones.
      */
