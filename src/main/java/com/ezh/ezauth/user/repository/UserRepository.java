@@ -38,6 +38,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """, nativeQuery = true)
     List<UserMiniProjection> findUserMini(@Param("userIds") List<Long> userIds);
 
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.addresses WHERE u.id IN :userIds")
+    List<User> findUsersWithAddressesByIds(@Param("userIds") List<Long> userIds);
+
     @Query("""
                 SELECT u FROM User u
                 WHERE (:tenantId IS NULL OR u.tenant.id = :tenantId)

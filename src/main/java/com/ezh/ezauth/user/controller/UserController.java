@@ -44,9 +44,12 @@ public class UserController {
     }
 
     @GetMapping(value = "/bulk", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<Map<Long, UserMiniDto>> getBulkUsers(@RequestParam("ids") List<Long> ids) throws CommonException {
+    public ResponseResource<Map<Long, UserMiniDto>> getBulkUsers(
+            @RequestParam("ids") List<Long> ids,
+            @RequestParam(value = "address", required = false, defaultValue = "false") boolean includeAddress
+    ) throws CommonException {
         log.info("Entered get bulk User details");
-        Map<Long, UserMiniDto> response = userService.getUsersMiniByIds(ids);
+        Map<Long, UserMiniDto> response = userService.getUsersMiniByIds(ids, includeAddress);
         return ResponseResource.success(HttpStatus.OK, response, "Bulk user fetched successfully");
     }
 

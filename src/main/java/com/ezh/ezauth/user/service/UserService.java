@@ -167,17 +167,40 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public Map<Long, UserMiniDto> getUsersMiniByIds(List<Long> userIds) throws CommonException {
+    public Map<Long, UserMiniDto> getUsersMiniByIds(List<Long> userIds, boolean includeAddress) throws CommonException {
         if (userIds == null || userIds.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        // Initialize variables
+        // When addresses are requested, bypass cache and fetch full entities with JOIN FETCH
+        if (includeAddress) {
+            Map<Long, UserMiniDto> resultMap = new HashMap<>();
+            List<User> users = userRepository.findUsersWithAddressesByIds(userIds);
+            for (User user : users) {
+                List<UserAddressDto> addresses = user.getAddresses() == null ? Collections.emptyList() :
+                        user.getAddresses().stream()
+                                .map(this::mapToAddressDto)
+                                .collect(Collectors.toList());
+
+                UserMiniDto dto = UserMiniDto.builder()
+                        .id(user.getId())
+                        .userType(user.getUserType().toString())
+                        .UserUuid(user.getUserUuid())
+                        .name(user.getFullName())
+                        .email(user.getEmail())
+                        .phone(user.getPhone())
+                        .userAddresses(addresses)
+                        .build();
+                resultMap.put(dto.getId(), dto);
+            }
+            return resultMap;
+        }
+
+        // Default path: use cache + projection query (no addresses)
         Cache cache = cacheManager.getCache("userMiniCache");
         Map<Long, UserMiniDto> resultMap = new HashMap<>();
         List<Long> missingIds = new ArrayList<>();
 
-        // 2. Check the cache for each individual User ID
         for (Long id : userIds) {
             UserMiniDto cachedUser = null;
             if (cache != null) {
@@ -185,13 +208,12 @@ public class UserService {
             }
 
             if (cachedUser != null) {
-                resultMap.put(id, cachedUser); // Cache hit
+                resultMap.put(id, cachedUser);
             } else {
-                missingIds.add(id); // Cache miss, we need to fetch this from DB
+                missingIds.add(id);
             }
         }
 
-        // Fetch ONLY the missing users from the database
         if (!missingIds.isEmpty()) {
             List<UserMiniProjection> projections = userRepository.findUserMini(missingIds);
 
@@ -205,10 +227,8 @@ public class UserService {
                         .phone(p.getPhone())
                         .build();
 
-                // Add to our final result
                 resultMap.put(dto.getId(), dto);
 
-                // Put the newly fetched user into the cache for next time
                 if (cache != null) {
                     cache.put(dto.getId(), dto);
                 }
