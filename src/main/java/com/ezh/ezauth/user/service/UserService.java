@@ -254,6 +254,7 @@ public class UserService {
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
                 .userType(user.getUserType().toString())
+                .profilePictureUuid(user.getProfilePictureUuid())
                 .tenantId(user.getTenant().getId());
 
         // 3. Basic Role Keys (Set<String>)

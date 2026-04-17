@@ -39,6 +39,9 @@ public class User {
     @Column(name = "phone")
     private String phone;
 
+    @Column(name = "profile_picture_uuid")
+    private String profilePictureUuid;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "user_type", nullable = false, length = 50)
     private UserType userType;
