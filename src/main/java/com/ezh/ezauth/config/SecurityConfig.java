@@ -64,11 +64,12 @@ public class SecurityConfig {
                 "http://localhost:8085",
                 "http://localhost:3000",
                 "http://localhost:4200",
-                "http://localhost:8080"
+                "http://localhost:8080",
+                "http://localhost:53026"
         ));
 
         config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
         config.setAllowedHeaders(List.of("*"));

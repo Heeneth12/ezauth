@@ -6,6 +6,7 @@ import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.security.JwtTokenProvider;
+import com.ezh.ezauth.subscription.service.SubscriptionService;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserInitResponse;
 import com.ezh.ezauth.user.entity.User;
@@ -43,6 +44,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final TenantService tenantService;
+    private final SubscriptionService subscriptionService;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -61,6 +63,10 @@ public class AuthService {
         // Fetch user
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
+            throw new CommonException("Your organization's subscription has expired or is inactive. Please contact support.", HttpStatus.FORBIDDEN);
+        }
 
         // Extract roles as comma-separated string
         String roles = extractUserRoles(user);
@@ -100,6 +106,11 @@ public class AuthService {
         // Fetch user
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Subscription Validation Check (in case it expired while they were logged in)
+        if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
+            throw new CommonException("Your organization's subscription has expired or is inactive.", HttpStatus.FORBIDDEN);
+        }
 
         // Extract roles as comma-separated string
         String roles = extractUserRoles(user);
@@ -200,6 +211,10 @@ public class AuthService {
 
             if (user == null) {
                 user = tenantService.registerGoogleTenant(email, name, pictureUrl, request.getAppKey());
+            }
+
+            if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
+                throw new CommonException("Your organization's subscription has expired or is inactive.", HttpStatus.FORBIDDEN);
             }
 
             // Extract roles as comma-separated string
