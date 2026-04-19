@@ -6,5 +6,6 @@ package com.ezh.ezauth.utils.common;
  */
 public enum Status {
     SUCCESS,
-    FAILURE
+    FAILURE,
+    NOT_FOUND
 }

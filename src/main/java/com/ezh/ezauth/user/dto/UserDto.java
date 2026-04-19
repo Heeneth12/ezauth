@@ -19,6 +19,7 @@ public class UserDto {
     private String phone;
     private Boolean isActive;
     private String userType;
+    private String profilePictureUuid;
     private Set<String> roles;
     private List<UserRoleDto> userRoles;
     private Set<Long> applicationIds;

@@ -2,6 +2,7 @@ package com.ezh.ezauth.tenant.controller;
 
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
+import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;

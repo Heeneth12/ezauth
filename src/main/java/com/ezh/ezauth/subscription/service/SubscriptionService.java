@@ -128,6 +128,13 @@ public class SubscriptionService {
         return mapToDto(plan);
     }
 
+    /**
+     * Checks if the given tenant has an active and unexpired subscription.
+     */
+    public boolean hasValidSubscription(Long tenantId) {
+        return subscriptionRepository.findValidSubscriptionByTenantId(tenantId).isPresent();
+    }
+
     // Helper mapper
     private SubscriptionPlanDto mapToDto(SubscriptionPlan plan) {
         return SubscriptionPlanDto.builder()

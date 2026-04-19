@@ -53,6 +53,20 @@ public class EmailService {
         }
     }
 
+
+    @Async
+    public void sendOtpEmail(String to, String otp) {
+        try {
+            Context context = new Context();
+            context.setVariable("otp", otp);
+            // Assuming you have a template named email-otp.html
+            String htmlBody = templateEngine.process("email-otp", context);
+            sendHtmlMessage(to, "Verify Your Email - Kubee", htmlBody);
+        } catch (MessagingException e) {
+            log.error("Failed to send OTP email to {}", to, e);
+        }
+    }
+
     private void sendHtmlMessage(String to, String subject, String htmlBody) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         // MULTIPART_MODE_MIXED_RELATED is best for HTML + Images
