@@ -42,6 +42,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/signin",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/google",
+                                "/api/v1/auth/verifyTenant/**",
                                 "/api/v1/auth/activate/**",
                                 "/actuator/**"
                         ).permitAll()

@@ -1,6 +1,7 @@
 package com.ezh.ezauth.tenant.service;
 
 
+import com.ezh.ezauth.auth.dto.AuthResponse;
 import com.ezh.ezauth.common.dto.ApplicationDto;
 import com.ezh.ezauth.common.entity.Application;
 import com.ezh.ezauth.common.entity.Module;
@@ -9,6 +10,7 @@ import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
+import com.ezh.ezauth.security.JwtTokenProvider;
 import com.ezh.ezauth.subscription.entity.Subscription;
 import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
 import com.ezh.ezauth.subscription.entity.SubscriptionStatus;
@@ -21,10 +23,7 @@ import com.ezh.ezauth.tenant.entity.TenantDetails;
 import com.ezh.ezauth.tenant.repository.TenantDetailsRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.UserDto;
-import com.ezh.ezauth.user.entity.User;
-import com.ezh.ezauth.user.entity.UserApplication;
-import com.ezh.ezauth.user.entity.UserModulePrivilege;
-import com.ezh.ezauth.user.entity.UserRole;
+import com.ezh.ezauth.user.entity.*;
 import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
 import com.ezh.ezauth.user.repository.UserRepository;
@@ -66,6 +65,7 @@ public class TenantService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final TenantDetailsRepository detailsRepository;
+    private final JwtTokenProvider jwtTokenProvider;
 
 
     @Transactional
@@ -92,6 +92,7 @@ public class TenantService {
                 .applications(Set.of(app))
                 .isPersonal(request.getIsPersonal())
                 .isActive(true)
+                .isVerify(false)
                 .build();
 
         tenant = tenantRepository.save(tenant);
@@ -103,7 +104,8 @@ public class TenantService {
                 .timeZone("Asia/Kolkata")
                 .legalName(request.getTenantName())
                 .build();
-        detailsRepository.save(tenantDetails);
+
+        tenant.setTenantDetails(tenantDetails);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
                 .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
@@ -155,6 +157,7 @@ public class TenantService {
                 .email(request.getAdminEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .phone(request.getAdminPhone())
+                .userType(UserType.SUPER_ADMIN)
                 .isActive(true)
                 .tenant(tenant)
                 .build();
@@ -211,6 +214,9 @@ public class TenantService {
                 .isActive(true)
                 .build();
 
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        emailService.sendOtpEmail(adminUser.getEmail(), otp);
+
         userRoleRepository.save(userRole);
         emailService.sendWelcomeEmail(request.getAdminEmail(), request.getTenantName());
 
@@ -223,6 +229,58 @@ public class TenantService {
                 .adminEmail(adminUser.getEmail())
                 .message("Tenant registered successfully")
                 .build();
+    }
+
+
+    @Transactional
+    public AuthResponse verifyTenantEmail(Long tenantId, String otp) {
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+
+        // Fetch user
+        User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        tenant.setIsVerify(true);
+        tenantRepository.save(tenant);
+
+        // Extract roles as comma-separated string
+        String roles = extractUserRoles(user);
+
+        // Generate tokens
+        String accessToken = jwtTokenProvider.generateAccessToken(
+                user.getId(),
+                user.getEmail(),
+                user.getTenant().getId(),
+                user.getUserType().name(),
+                roles
+        );
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .message("Success")
+                .build();
+    }
+
+    /**
+     * Extract active user roles as comma-separated string
+     *
+     * @param user User entity with roles
+     * @return Comma-separated role keys (e.g., "ADMIN,VIEWER") or empty string
+     */
+    private String extractUserRoles(User user) {
+        if (user.getUserRoles() == null) {
+            return "";
+        }
+        return user.getUserRoles().stream()
+                .filter(UserRole::getIsActive)
+                .map(ur -> ur.getRole().getRoleKey())
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
     }
 
     @Transactional

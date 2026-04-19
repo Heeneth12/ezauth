@@ -43,6 +43,9 @@ public class Tenant {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "is_verify", nullable = false)
+    private Boolean isVerify = true;
+
     // Tenant admin (Owner user)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_admin_user_id")

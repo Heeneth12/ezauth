@@ -78,4 +78,11 @@ public class AuthController {
         CommonResponse response = authService.validateToken(token);
         return ResponseResource.success(HttpStatus.OK, response, "Token is valid");
     }
+
+    @PostMapping(value = "/verifyTenant", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<AuthResponse>  verifyTenant(@RequestParam Long tenantId, @RequestParam String otp) throws CommonException {
+        log.info("verify Tenant email ID: {}", tenantId);
+        AuthResponse response  = tenantService.verifyTenantEmail(tenantId, otp);
+        return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
+    }
 }
