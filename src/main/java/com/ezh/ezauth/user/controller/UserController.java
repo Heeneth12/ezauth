@@ -1,6 +1,7 @@
 package com.ezh.ezauth.user.controller;
 
 import com.ezh.ezauth.user.dto.CreateUserRequest;
+import jakarta.validation.Valid;
 import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.dto.UserFilter;
 import com.ezh.ezauth.user.dto.UserMiniDto;
@@ -29,7 +30,7 @@ public class UserController {
 
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> createUser(@RequestBody CreateUserRequest request) throws CommonException {
+    public ResponseResource<CommonResponse> createUser(@Valid @RequestBody CreateUserRequest request) throws CommonException {
         log.info("Entered Creating new user with email: {}", request.getEmail());
         CommonResponse response = userService.createUser(request);
         return ResponseResource.success(HttpStatus.CREATED, response, "User created successfully");
@@ -60,8 +61,8 @@ public class UserController {
         return ResponseResource.success(HttpStatus.OK, response, "User fetched successfully");
     }
 
-    @PostMapping(value = "/{userId}/update", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> updateUser(@PathVariable Long userId, @RequestBody CreateUserRequest request) throws CommonException {
+    @PutMapping(value = "/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateUser(@PathVariable Long userId, @Valid @RequestBody CreateUserRequest request) throws CommonException {
         log.info("Updating user with ID: {}", userId);
         CommonResponse response = userService.updateUser(userId, request);
         return ResponseResource.success(HttpStatus.OK, response, "User updated successfully");

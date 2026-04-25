@@ -39,8 +39,8 @@ public class TenantController {
         return ResponseResource.success(HttpStatus.OK, response, "Bulk tenants fetched successfully");
     }
 
-    @PostMapping(value = "/{tenantId}/update", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> updateTenant(@PathVariable Long tenantId, @RequestBody TenantRegistrationRequest request) throws CommonException {
+    @PutMapping(value = "/{tenantId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateTenant(@PathVariable Long tenantId, @Valid @RequestBody TenantRegistrationRequest request) throws CommonException {
         log.info("Entered updateTenant details with : {}", request);
         CommonResponse response = tenantService.updateTenant(tenantId, request);
         return ResponseResource.success(HttpStatus.OK, response, "Tenants updated successfully");
