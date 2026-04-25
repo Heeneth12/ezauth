@@ -30,6 +30,7 @@ CREATE TABLE tenants (
     tenant_code VARCHAR(100) NOT NULL UNIQUE,
     is_personal BOOLEAN NOT NULL DEFAULT false,
     is_active BOOLEAN NOT NULL DEFAULT true,
+    is_verify BOOLEAN,
     tenant_admin_user_id BIGINT,
     current_subscription_id BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
