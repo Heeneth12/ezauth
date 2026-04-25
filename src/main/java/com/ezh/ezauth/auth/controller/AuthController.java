@@ -81,6 +81,15 @@ public class AuthController {
         return ResponseResource.success(HttpStatus.OK, response, "Token is valid");
     }
 
+    @PostMapping(value = "/signout", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> signout(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) throws CommonException {
+        log.info("Entered signout");
+        String token = bearerToken.startsWith("Bearer ") ? bearerToken.substring(7) : bearerToken;
+        CommonResponse response = authService.signout(token);
+        return ResponseResource.success(HttpStatus.OK, response, "Signed out successfully");
+    }
+
     @PostMapping(value = "/verifyTenant", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<AuthResponse>  verifyTenant(@RequestParam Long tenantId, @RequestParam String otp) throws CommonException {
         log.info("verify tenant email ID: {}", tenantId);

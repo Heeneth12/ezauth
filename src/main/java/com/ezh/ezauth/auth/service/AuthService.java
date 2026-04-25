@@ -2,7 +2,9 @@ package com.ezh.ezauth.auth.service;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.ForgotPasswordRequest;
 import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
+import com.ezh.ezauth.auth.dto.ResetPasswordRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.security.JwtTokenProvider;
@@ -13,6 +15,7 @@ import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.entity.UserRole;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
+import com.ezh.ezauth.utils.EmailService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -20,16 +23,20 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import java.util.Collections;
+import java.util.Random;
 import org.springframework.beans.factory.annotation.Value;
 
 
@@ -44,6 +51,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final TenantService tenantService;
     private final SubscriptionService subscriptionService;
+    private final CacheManager cacheManager;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -185,6 +195,22 @@ public class AuthService {
         return CommonResponse.builder()
                 .status(Status.SUCCESS)
                 .message("Token is valid")
+                .build();
+    }
+
+    public CommonResponse signout(String token) {
+        try {
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            Cache userInitCacheRef = cacheManager.getCache("userInitCache");
+            if (userInitCacheRef != null) {
+                userInitCacheRef.evict(userId);
+            }
+        } catch (Exception e) {
+            log.warn("Signout cache eviction skipped: {}", e.getMessage());
+        }
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Signed out successfully")
                 .build();
     }
 
