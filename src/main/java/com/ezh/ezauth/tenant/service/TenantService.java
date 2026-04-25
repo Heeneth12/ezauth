@@ -73,7 +73,7 @@ public class TenantService {
 
         // 1. Validate email doesn't already exist
         if (userRepository.existsByEmail(request.getAdminEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new CommonException("Email already registered", HttpStatus.CONFLICT);
         }
 
         // 2. Generate unique tenant code
@@ -83,7 +83,7 @@ public class TenantService {
         }
 
         Application app = applicationRepository.findByAppKey(request.getAppKey())
-                .orElseThrow(() -> new RuntimeException("Invalid application"));
+                .orElseThrow(() -> new CommonException("Invalid application key", HttpStatus.BAD_REQUEST));
 
         // 3. Create Tenant
         Tenant tenant = Tenant.builder()
@@ -108,7 +108,7 @@ public class TenantService {
         tenant.setTenantDetails(tenantDetails);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
-                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+                .orElseThrow(() -> new CommonException("Default subscription plan not found. Contact support.", HttpStatus.INTERNAL_SERVER_ERROR));
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -236,11 +236,11 @@ public class TenantService {
     public AuthResponse verifyTenantEmail(Long tenantId, String otp) {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
         // Fetch user
         User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         tenant.setIsVerify(true);
         tenantRepository.save(tenant);
@@ -287,7 +287,7 @@ public class TenantService {
     public CommonResponse updateTenant(Long tenantId, TenantRegistrationRequest request) {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
         if (request.getAdminPhone() != null && !request.getAdminPhone().isBlank()) {
             User admin = tenant.getTenantAdmin();
@@ -325,7 +325,7 @@ public class TenantService {
     public TenantDto getTenantById(Long tenantId) {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
         return dtoConstructor(tenant);
     }
@@ -364,7 +364,7 @@ public class TenantService {
         String targetAppKey = (appKey != null && !appKey.isEmpty()) ? appKey : "EZH_INV_001";
 
         Application app = applicationRepository.findByAppKey(targetAppKey)
-                .orElseThrow(() -> new RuntimeException("Invalid application key for registration"));
+                .orElseThrow(() -> new CommonException("Invalid application key", HttpStatus.BAD_REQUEST));
 
         // 3. Generate Codes
         String tenantCode = generateTenantCode(fullName);
@@ -383,7 +383,7 @@ public class TenantService {
         tenant = tenantRepository.save(tenant);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
-                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+                .orElseThrow(() -> new CommonException("Default subscription plan not found. Contact support.", HttpStatus.INTERNAL_SERVER_ERROR));
 
         LocalDateTime now = LocalDateTime.now();
         //Create the Subscription object
@@ -599,9 +599,9 @@ public class TenantService {
 
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
-        return tenantName.toUpperCase()
-                .replaceAll("[^A-Z0-9]", "")
-                .substring(0, Math.min(tenantName.length(), 6));
+        String sanitized = tenantName.toUpperCase().replaceAll("[^A-Z0-9]", "");
+        if (sanitized.isEmpty()) sanitized = "TENANT";
+        return sanitized.substring(0, Math.min(sanitized.length(), 6));
     }
 
 
