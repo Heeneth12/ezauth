@@ -214,6 +214,53 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public CommonResponse forgotPassword(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            String otp = String.format("%06d", new Random().nextInt(999999));
+            Cache pwdResetCache = cacheManager.getCache("pwdResetCache");
+            if (pwdResetCache != null) {
+                pwdResetCache.put(request.getEmail(), otp);
+            }
+            emailService.sendOtpEmail(request.getEmail(), otp);
+        });
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("If this email exists, a reset code has been sent")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse resetPassword(ResetPasswordRequest request) throws CommonException {
+        Cache pwdResetCache = cacheManager.getCache("pwdResetCache");
+        String cachedOtp = pwdResetCache != null
+                ? pwdResetCache.get(request.getEmail(), String.class)
+                : null;
+
+        if (cachedOtp == null) {
+            throw new CommonException("OTP has expired. Please request a new password reset.", HttpStatus.GONE);
+        }
+
+        if (!cachedOtp.equals(request.getOtp())) {
+            throw new CommonException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        if (pwdResetCache != null) pwdResetCache.evict(request.getEmail());
+        Cache userInitCacheRef = cacheManager.getCache("userInitCache");
+        if (userInitCacheRef != null) userInitCacheRef.evict(user.getId());
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Password reset successfully")
+                .build();
+    }
+
     @Transactional
     public AuthResponse signInWithGoogle(GoogleSignInRequest request) throws CommonException {
         try {

@@ -2,7 +2,10 @@ package com.ezh.ezauth.auth.controller;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.ForgotPasswordRequest;
 import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
+import com.ezh.ezauth.auth.dto.ResetPasswordRequest;
+import com.ezh.ezauth.auth.dto.ResendOtpRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.auth.service.AuthService;
@@ -88,6 +91,20 @@ public class AuthController {
         String token = bearerToken.startsWith("Bearer ") ? bearerToken.substring(7) : bearerToken;
         CommonResponse response = authService.signout(token);
         return ResponseResource.success(HttpStatus.OK, response, "Signed out successfully");
+    }
+
+    @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("Entered forgot-password");
+        CommonResponse response = authService.forgotPassword(request);
+        return ResponseResource.success(HttpStatus.OK, response, response.getMessage());
+    }
+
+    @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) throws CommonException {
+        log.info("Entered reset-password");
+        CommonResponse response = authService.resetPassword(request);
+        return ResponseResource.success(HttpStatus.OK, response, "Password reset successfully");
     }
 
     @PostMapping(value = "/verifyTenant", produces = MediaType.APPLICATION_JSON_VALUE)
