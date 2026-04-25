@@ -780,8 +780,10 @@ public class UserService {
         return mappings;
     }
 
-    public Page<UserDto> searchUsers(UserFilter filter) {
-        Pageable pageable = Pageable.unpaged();
+    public Page<UserDto> searchUsers(UserFilter filter, Integer page, Integer size) {
+        int safePage = page != null ? page : 0;
+        int safeSize = (size != null) ? Math.min(size, 500) : 50;
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by("id").descending());
 
         String email = (filter != null && StringUtils.hasText(filter.getEmail())) ? filter.getEmail().trim().toLowerCase() : null;
         String search = (filter != null && StringUtils.hasText(filter.getSearchQuery())) ? filter.getSearchQuery().trim().toLowerCase() : null;
@@ -794,6 +796,6 @@ public class UserService {
 
         return userRepository
                 .findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
-                .map(dto -> constructUserDto(dto, true)); // true for full details
+                .map(dto -> constructUserDto(dto, true));
     }
 }

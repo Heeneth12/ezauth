@@ -76,10 +76,13 @@ public class UserController {
     }
 
     @PostMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<Page<UserDto>> searchUsers(@RequestBody UserFilter filter) throws CommonException {
-        log.info("Entered get all users details");
-        Page<UserDto> response = userService.searchUsers(filter);
-        return ResponseResource.success(HttpStatus.OK, response, "All users fetched successfully");
+    public ResponseResource<Page<UserDto>> searchUsers(
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "50") Integer size,
+            @RequestBody UserFilter filter) throws CommonException {
+        log.info("Entered search users");
+        Page<UserDto> response = userService.searchUsers(filter, page, size);
+        return ResponseResource.success(HttpStatus.OK, response, "Users fetched successfully");
     }
 
     @PostMapping(value = "/{userId}/address", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
