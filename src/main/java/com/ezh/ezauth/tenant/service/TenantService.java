@@ -30,6 +30,8 @@ import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.UserRoleRepository;
 import com.ezh.ezauth.utils.EmailService;
 import com.ezh.ezauth.utils.common.CommonResponse;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +68,7 @@ public class TenantService {
     private final SubscriptionRepository subscriptionRepository;
     private final TenantDetailsRepository detailsRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final CacheManager cacheManager;
 
 
     @Transactional
@@ -73,7 +76,7 @@ public class TenantService {
 
         // 1. Validate email doesn't already exist
         if (userRepository.existsByEmail(request.getAdminEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new CommonException("Email already registered", HttpStatus.CONFLICT);
         }
 
         // 2. Generate unique tenant code
@@ -83,7 +86,7 @@ public class TenantService {
         }
 
         Application app = applicationRepository.findByAppKey(request.getAppKey())
-                .orElseThrow(() -> new RuntimeException("Invalid application"));
+                .orElseThrow(() -> new CommonException("Invalid application key", HttpStatus.BAD_REQUEST));
 
         // 3. Create Tenant
         Tenant tenant = Tenant.builder()
@@ -108,7 +111,7 @@ public class TenantService {
         tenant.setTenantDetails(tenantDetails);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
-                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+                .orElseThrow(() -> new CommonException("Default subscription plan not found. Contact support.", HttpStatus.INTERNAL_SERVER_ERROR));
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -215,6 +218,10 @@ public class TenantService {
                 .build();
 
         String otp = String.format("%06d", new Random().nextInt(999999));
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        if (otpCacheRef != null) {
+            otpCacheRef.put("otp:tenant:" + tenant.getId(), otp);
+        }
         emailService.sendOtpEmail(adminUser.getEmail(), otp);
 
         userRoleRepository.save(userRole);
@@ -233,22 +240,40 @@ public class TenantService {
 
 
     @Transactional
-    public AuthResponse verifyTenantEmail(Long tenantId, String otp) {
+    public AuthResponse verifyTenantEmail(Long tenantId, String otp) throws CommonException {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
-        // Fetch user
-        User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (Boolean.TRUE.equals(tenant.getIsVerify())) {
+            throw new CommonException("Tenant already verified", HttpStatus.CONFLICT);
+        }
+
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        String cachedOtp = otpCacheRef != null
+                ? otpCacheRef.get("otp:tenant:" + tenantId, String.class)
+                : null;
+
+        if (cachedOtp == null) {
+            throw new CommonException("OTP has expired or was not found. Please request a new OTP.", HttpStatus.GONE);
+        }
+
+        if (!cachedOtp.equals(otp)) {
+            throw new CommonException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        if (otpCacheRef != null) {
+            otpCacheRef.evict("otp:tenant:" + tenantId);
+        }
 
         tenant.setIsVerify(true);
         tenantRepository.save(tenant);
 
-        // Extract roles as comma-separated string
+        User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
+                .orElseThrow(() -> new CommonException("Admin user not found", HttpStatus.NOT_FOUND));
+
         String roles = extractUserRoles(user);
 
-        // Generate tokens
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
@@ -262,7 +287,7 @@ public class TenantService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .message("Success")
+                .message("Email verified successfully")
                 .build();
     }
 
@@ -283,11 +308,86 @@ public class TenantService {
                 .orElse("");
     }
 
+    @Transactional(readOnly = true)
+    public CommonResponse resendOtp(Long tenantId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (Boolean.TRUE.equals(tenant.getIsVerify())) {
+            throw new CommonException("Tenant is already verified", HttpStatus.CONFLICT);
+        }
+
+        User admin = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
+                .orElseThrow(() -> new CommonException("Admin user not found", HttpStatus.NOT_FOUND));
+
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        if (otpCacheRef != null) {
+            otpCacheRef.put("otp:tenant:" + tenantId, otp);
+        }
+        emailService.sendOtpEmail(admin.getEmail(), otp);
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("OTP resent successfully")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse toggleTenantStatus(Long tenantId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        boolean deactivating = Boolean.TRUE.equals(tenant.getIsActive());
+        if (deactivating) {
+            long activeUserCount = userRepository.countByTenant_IdAndIsActive(tenantId, true);
+            if (activeUserCount > 0) {
+                throw new CommonException(
+                        "Cannot deactivate tenant with " + activeUserCount + " active user(s). Deactivate all users first.",
+                        HttpStatus.CONFLICT);
+            }
+        }
+
+        tenant.setIsActive(!tenant.getIsActive());
+        tenantRepository.save(tenant);
+
+        String statusLabel = Boolean.TRUE.equals(tenant.getIsActive()) ? "Active" : "Inactive";
+        return CommonResponse.builder()
+                .id(tenantId.toString())
+                .status(Status.SUCCESS)
+                .message("Tenant status toggled. Current status: " + statusLabel)
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse deleteTenantAddress(Long tenantId, Long addressId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (tenant.getAddresses() == null || tenant.getAddresses().isEmpty()) {
+            throw new CommonException("No addresses found for this tenant", HttpStatus.NOT_FOUND);
+        }
+
+        TenantAddress addressToDelete = tenant.getAddresses().stream()
+                .filter(a -> a.getId() != null && a.getId().equals(addressId))
+                .findFirst()
+                .orElseThrow(() -> new CommonException("Address not found for this tenant", HttpStatus.NOT_FOUND));
+
+        tenant.getAddresses().remove(addressToDelete);
+        tenantRepository.save(tenant);
+
+        return CommonResponse.builder()
+                .id(addressId.toString())
+                .status(Status.SUCCESS)
+                .message("Tenant address deleted successfully")
+                .build();
+    }
+
     @Transactional
     public CommonResponse updateTenant(Long tenantId, TenantRegistrationRequest request) {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
         if (request.getAdminPhone() != null && !request.getAdminPhone().isBlank()) {
             User admin = tenant.getTenantAdmin();
@@ -325,7 +425,7 @@ public class TenantService {
     public TenantDto getTenantById(Long tenantId) {
 
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with ID: " + tenantId));
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
         return dtoConstructor(tenant);
     }
@@ -364,7 +464,7 @@ public class TenantService {
         String targetAppKey = (appKey != null && !appKey.isEmpty()) ? appKey : "EZH_INV_001";
 
         Application app = applicationRepository.findByAppKey(targetAppKey)
-                .orElseThrow(() -> new RuntimeException("Invalid application key for registration"));
+                .orElseThrow(() -> new CommonException("Invalid application key", HttpStatus.BAD_REQUEST));
 
         // 3. Generate Codes
         String tenantCode = generateTenantCode(fullName);
@@ -383,7 +483,7 @@ public class TenantService {
         tenant = tenantRepository.save(tenant);
 
         SubscriptionPlan defaultPlan = subscriptionPlanRepository.findByName("Free Trial")
-                .orElseThrow(() -> new RuntimeException("Default subscription plan not found"));
+                .orElseThrow(() -> new CommonException("Default subscription plan not found. Contact support.", HttpStatus.INTERNAL_SERVER_ERROR));
 
         LocalDateTime now = LocalDateTime.now();
         //Create the Subscription object
@@ -599,9 +699,9 @@ public class TenantService {
 
     // Helper method to generate tenant code
     private String generateTenantCode(String tenantName) {
-        return tenantName.toUpperCase()
-                .replaceAll("[^A-Z0-9]", "")
-                .substring(0, Math.min(tenantName.length(), 6));
+        String sanitized = tenantName.toUpperCase().replaceAll("[^A-Z0-9]", "");
+        if (sanitized.isEmpty()) sanitized = "TENANT";
+        return sanitized.substring(0, Math.min(sanitized.length(), 6));
     }
 
 

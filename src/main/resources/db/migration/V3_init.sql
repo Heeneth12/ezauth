@@ -1,9 +1,3 @@
-CREATE SCHEMA IF NOT EXISTS auth;
-SET search_path TO auth;
-
--- ==========================================================
--- 1. DROP EXISTING TABLES (CLEAN SLATE)
--- ==========================================================
 DROP TABLE IF EXISTS user_module_privileges CASCADE;
 DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS user_applications CASCADE;
@@ -20,9 +14,32 @@ DROP TABLE IF EXISTS applications CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 DROP TABLE IF EXISTS flyway_test CASCADE;
 
--- ==========================================================
--- 2. CORE TABLES (TENANTS & APPLICATIONS)
--- ==========================================================
+
+-- Catalog of available subscription tiers
+CREATE TABLE subscription_plans (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    type VARCHAR(50) NOT NULL, -- Enum: LIFETIME, MONTHLY, YEARLY
+    price NUMERIC(19, 2) NOT NULL DEFAULT 0.00,
+    duration_days INTEGER NOT NULL,
+    max_users INTEGER,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE applications (
+    id BIGSERIAL PRIMARY KEY,
+    app_name VARCHAR(255) NOT NULL,
+    app_key VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tenants: The core of the multi-tenant architecture
 CREATE TABLE tenants (
     id BIGSERIAL PRIMARY KEY,
     tenant_uuid VARCHAR(36) NOT NULL UNIQUE,
@@ -30,9 +47,8 @@ CREATE TABLE tenants (
     tenant_code VARCHAR(100) NOT NULL UNIQUE,
     is_personal BOOLEAN NOT NULL DEFAULT false,
     is_active BOOLEAN NOT NULL DEFAULT true,
-    is_verify BOOLEAN,
-    tenant_admin_user_id BIGINT,
-    current_subscription_id BIGINT,
+    tenant_admin_user_id BIGINT,     -- Linked via ALTER later
+    current_subscription_id BIGINT,  -- Linked via ALTER later
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,19 +75,10 @@ CREATE TABLE tenant_details (
     CONSTRAINT fk_tenant_details_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
 );
 
-CREATE TABLE applications (
-    id BIGSERIAL PRIMARY KEY,
-    app_name VARCHAR(255) NOT NULL,
-    app_key VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- ==========================================================
+-- 3. APP STRUCTURE (HIERARCHY: APP -> MODULE -> PRIVILEGE)
+-- ==========================================================
 
--- ==========================================================
--- 3. APP STRUCTURE (MODULES & PRIVILEGES)
--- ==========================================================
 CREATE TABLE modules (
     id BIGSERIAL PRIMARY KEY,
     module_name VARCHAR(255) NOT NULL,
@@ -97,8 +104,9 @@ CREATE TABLE privileges (
 );
 
 -- ==========================================================
--- 4. USERS & ROLES
+-- 4. IDENTITY & ACCESS MANAGEMENT
 -- ==========================================================
+
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     user_uuid VARCHAR(36) NOT NULL UNIQUE,
@@ -106,8 +114,6 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
-    user_type VARCHAR(50) NOT NULL,
-    is_login_enabled NOT NULL DEFAULT true,
     is_active BOOLEAN NOT NULL DEFAULT true,
     tenant_id BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -130,8 +136,10 @@ CREATE TABLE roles (
 );
 
 -- ==========================================================
--- 5. MAPPING TABLES (ASSIGNMENTS)
+-- 5. RELATIONSHIP MAPPING TABLES
 -- ==========================================================
+
+-- Maps users to specific applications within the suite
 CREATE TABLE user_applications (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -143,6 +151,7 @@ CREATE TABLE user_applications (
     CONSTRAINT fk_ua_application FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
 );
 
+-- RBAC: Assigning roles to users
 CREATE TABLE user_roles (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -155,6 +164,7 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_ur_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 );
 
+-- Granular overrides/direct privileges for a user per application module
 CREATE TABLE user_module_privileges (
     id BIGSERIAL PRIMARY KEY,
     user_application_id BIGINT NOT NULL,
@@ -167,6 +177,7 @@ CREATE TABLE user_module_privileges (
     CONSTRAINT fk_ump_privilege FOREIGN KEY (privilege_id) REFERENCES privileges(id) ON DELETE CASCADE
 );
 
+-- Which applications are enabled for which tenant
 CREATE TABLE tenant_applications (
     tenant_id BIGINT NOT NULL,
     application_id BIGINT NOT NULL,
@@ -176,26 +187,14 @@ CREATE TABLE tenant_applications (
 );
 
 -- ==========================================================
--- 6. SUBSCRIPTIONS
+-- 6. BILLING & ADDRESSING
 -- ==========================================================
-CREATE TABLE subscription_plans (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    type VARCHAR(50) NOT NULL,
-    price NUMERIC(19, 2) NOT NULL DEFAULT 0.00,
-    duration_days INTEGER NOT NULL,
-    max_users INTEGER,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 
 CREATE TABLE subscriptions (
     id BIGSERIAL PRIMARY KEY,
     plan_id BIGINT NOT NULL,
     tenant_id BIGINT NOT NULL,
-    status VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL, -- ACTIVE, EXPIRED, CANCELLED
     start_date TIMESTAMP NOT NULL,
     end_date TIMESTAMP NOT NULL,
     auto_renew BOOLEAN DEFAULT false,
@@ -205,16 +204,11 @@ CREATE TABLE subscriptions (
     CONSTRAINT fk_sub_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 
--- ==========================================================
--- 7. ADDRESS TABLES
--- ==========================================================
 CREATE TABLE tenant_address (
     id BIGSERIAL PRIMARY KEY,
     tenant_id BIGINT NOT NULL,
     address_line1 VARCHAR(255),
     address_line2 VARCHAR(255),
-    route VARCHAR(100),
-    area VARCHAR(100),
     city VARCHAR(100),
     state VARCHAR(100),
     country VARCHAR(100),
@@ -230,11 +224,7 @@ CREATE TABLE user_address (
     user_id BIGINT NOT NULL,
     tenant_id BIGINT NOT NULL,
     address_line1 VARCHAR(255),
-    address_line2 VARCHAR(255),
-    route VARCHAR(100),
-    area VARCHAR(100),
     city VARCHAR(100),
-    state VARCHAR(100),
     country VARCHAR(100),
     pin_code VARCHAR(20),
     address_type VARCHAR(50) NOT NULL,
@@ -245,28 +235,42 @@ CREATE TABLE user_address (
 );
 
 -- ==========================================================
--- 8. UTILITY & LATE CONSTRAINTS
+-- 7. PERFORMANCE INDEXES
 -- ==========================================================
-CREATE TABLE flyway_test (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(50)
-);
+CREATE INDEX idx_users_tenant_id ON users(tenant_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_modules_application_id ON modules(application_id);
+CREATE INDEX idx_roles_tenant_id ON roles(tenant_id);
+CREATE INDEX idx_user_applications_user_id ON user_applications(user_id);
+CREATE INDEX idx_subscriptions_tenant_id ON subscriptions(tenant_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 
--- Circular references resolved after tables exist
+-- ==========================================================
+-- 8. CIRCULAR REFERENCE RESOLUTION
+-- ==========================================================
 ALTER TABLE tenants ADD CONSTRAINT fk_tenant_admin FOREIGN KEY (tenant_admin_user_id) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE tenants ADD CONSTRAINT fk_tenant_curr_sub FOREIGN KEY (current_subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL;
 
+-- ==========================================================
+-- 9. SEED DATA (CORE APPS & PLANS)
+-- ==========================================================
 
--- ==========================================================
--- SEED APPLICATIONS
--- ==========================================================
+-- Seed Subscription Plans
+INSERT INTO subscription_plans
+(name, description, type, price, duration_days, max_users, is_active)
+VALUES
+('Free Trial', 'Experience the full platform for 14 days.', 'LIFETIME', 0.00, 14, 2, true),
+('Basic', 'Essential tools for small teams.', 'MONTHLY', 9.99, 30, 5, true),
+('Pro Monthly', 'Advanced features for growing businesses.', 'MONTHLY', 29.99, 30, 20, true),
+('Pro Yearly', 'Best value for established teams. Save 17%.', 'YEARLY', 299.00, 365, 20, true),
+('Enterprise', 'Unlimited access and priority support for large organizations.', 'YEARLY', 999.00, 365, 1000, true);
+
 
 -- 1. INSERT APPLICATION
 INSERT INTO applications (id, app_name, app_key, description)
 VALUES (1, 'Inventory Management', 'EZH_INV_APP', 'Core system for stock, sales, and purchase tracking');
 
 -- 2. INSERT MODULES
--- We explicitly set IDs to ensure they match the privilege inserts below
 INSERT INTO modules (id, module_name, module_key, application_id) VALUES
 (1, 'Dashboard', 'EZH_INV_DASHBOARD', 1),
 (2, 'Items Management', 'EZH_INV_ITEMS', 1),
@@ -278,8 +282,7 @@ INSERT INTO modules (id, module_name, module_key, application_id) VALUES
 (8, 'Reports', 'EZH_INV_REPORTS', 1),
 (9, 'Documents', 'EZH_INV_DOCUMENTS', 1),
 (10, 'Admin', 'EZH_INV_USER_MGMT', 1),
-(11, 'Settings', 'EZH_INV_SETTINGS', 1)
-(12, 'Vendor Management', 'EZH_INV_VENDOR', 1);
+(11, 'Settings', 'EZH_INV_SETTINGS', 1);
 
 -- 3. INSERT PRIVILEGES
 INSERT INTO privileges (privilege_name, privilege_key, module_id) VALUES
@@ -340,44 +343,3 @@ INSERT INTO privileges (privilege_name, privilege_key, module_id) VALUES
 -- SETTINGS
 ('View Settings', 'EZH_INV_SETTINGS_VIEW', 11),
 ('Update Settings', 'EZH_INV_SETTINGS_EDIT', 11);
-
--- ITEMS
-('View Purchase Request', 'EZH_INV_PRQ_VIEW', 12);
-
-
--- ==========================================================
--- 9. SEED DEFAULT PLANS
--- ==========================================================
-INSERT INTO subscription_plans (name, description, type, price, duration_days, max_users, is_active)
-VALUES
-('Free Trial', 'Experience the full platform for 14 days.', 'LIFETIME', 0.00, 14, 2, true),
-('Basic', 'Essential tools for small teams.', 'MONTHLY', 9.99, 30, 5, true),
-('Pro Monthly', 'Advanced features for growing businesses.', 'MONTHLY', 29.99, 30, 20, true),
-('Pro Yearly', 'Best value for established teams. Save 17%.', 'YEARLY', 299.00, 365, 20, true),
-('Enterprise', 'Unlimited access and priority support for large organizations.', 'YEARLY', 999.00, 365, 1000, true);
-
--- ==========================================================
--- 10. INDEXES
--- ==========================================================
-CREATE INDEX idx_users_tenant_id ON users(tenant_id);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_is_active ON users(is_active);
-CREATE INDEX idx_modules_application_id ON modules(application_id);
-CREATE INDEX idx_modules_is_active ON modules(is_active);
-CREATE INDEX idx_privileges_module_id ON privileges(module_id);
-CREATE INDEX idx_roles_tenant_id ON roles(tenant_id);
-CREATE INDEX idx_roles_is_active ON roles(is_active);
-CREATE INDEX idx_user_applications_user_id ON user_applications(user_id);
-CREATE INDEX idx_user_applications_application_id ON user_applications(application_id);
-CREATE INDEX idx_user_applications_is_active ON user_applications(is_active);
-CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
-CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
-CREATE INDEX idx_user_module_privileges_ua_id ON user_module_privileges(user_application_id);
-CREATE INDEX idx_tenant_applications_tenant_id ON tenant_applications(tenant_id);
-CREATE INDEX idx_tenant_address_tenant_id ON tenant_address(tenant_id);
-CREATE INDEX idx_user_address_user_id ON user_address(user_id);
-CREATE INDEX idx_user_address_tenant_id ON user_address(tenant_id);
-CREATE INDEX idx_subscriptions_tenant_id ON subscriptions(tenant_id);
-CREATE INDEX idx_subscriptions_plan_id ON subscriptions(plan_id);
-CREATE INDEX idx_subscriptions_status ON subscriptions(status);
-CREATE INDEX idx_tenants_current_subscription ON tenants(current_subscription_id);

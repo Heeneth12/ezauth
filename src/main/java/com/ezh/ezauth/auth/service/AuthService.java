@@ -2,7 +2,9 @@ package com.ezh.ezauth.auth.service;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.auth.dto.ForgotPasswordRequest;
 import com.ezh.ezauth.auth.dto.GoogleSignInRequest;
+import com.ezh.ezauth.auth.dto.ResetPasswordRequest;
 import com.ezh.ezauth.auth.dto.SignInRequest;
 import com.ezh.ezauth.auth.dto.TokenRefreshRequest;
 import com.ezh.ezauth.security.JwtTokenProvider;
@@ -13,6 +15,7 @@ import com.ezh.ezauth.user.entity.User;
 import com.ezh.ezauth.user.entity.UserRole;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
+import com.ezh.ezauth.utils.EmailService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -20,19 +23,22 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import java.util.Collections;
+import java.util.Random;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.util.Collections;
 
 @Slf4j
 @Service
@@ -45,6 +51,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final TenantService tenantService;
     private final SubscriptionService subscriptionService;
+    private final CacheManager cacheManager;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -62,7 +71,11 @@ public class AuthService {
 
         // Fetch user
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CommonException("Invalid credentials", HttpStatus.UNAUTHORIZED));
+
+        if (!user.getIsActive()) {
+            throw new CommonException("Account is inactive. Contact your administrator.", HttpStatus.FORBIDDEN);
+        }
 
         if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
             throw new CommonException("Your organization's subscription has expired or is inactive. Please contact support.", HttpStatus.FORBIDDEN);
@@ -97,7 +110,7 @@ public class AuthService {
 
         // Validate refresh token
         if (!jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
-            throw new RuntimeException("Invalid refresh token");
+            throw new CommonException("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
         }
 
         // Get user ID from refresh token
@@ -105,7 +118,7 @@ public class AuthService {
 
         // Fetch user
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         // Subscription Validation Check (in case it expired while they were logged in)
         if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
@@ -130,7 +143,8 @@ public class AuthService {
                 .builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
-                .message("")
+                .tokenType("Bearer")
+                .message("Token refreshed successfully")
                 .build();
     }
 
@@ -181,6 +195,69 @@ public class AuthService {
         return CommonResponse.builder()
                 .status(Status.SUCCESS)
                 .message("Token is valid")
+                .build();
+    }
+
+    public CommonResponse signout(String token) {
+        try {
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            Cache userInitCacheRef = cacheManager.getCache("userInitCache");
+            if (userInitCacheRef != null) {
+                userInitCacheRef.evict(userId);
+            }
+        } catch (Exception e) {
+            log.warn("Signout cache eviction skipped: {}", e.getMessage());
+        }
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Signed out successfully")
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public CommonResponse forgotPassword(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            String otp = String.format("%06d", new Random().nextInt(999999));
+            Cache pwdResetCache = cacheManager.getCache("pwdResetCache");
+            if (pwdResetCache != null) {
+                pwdResetCache.put(request.getEmail(), otp);
+            }
+            emailService.sendOtpEmail(request.getEmail(), otp);
+        });
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("If this email exists, a reset code has been sent")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse resetPassword(ResetPasswordRequest request) throws CommonException {
+        Cache pwdResetCache = cacheManager.getCache("pwdResetCache");
+        String cachedOtp = pwdResetCache != null
+                ? pwdResetCache.get(request.getEmail(), String.class)
+                : null;
+
+        if (cachedOtp == null) {
+            throw new CommonException("OTP has expired. Please request a new password reset.", HttpStatus.GONE);
+        }
+
+        if (!cachedOtp.equals(request.getOtp())) {
+            throw new CommonException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        if (pwdResetCache != null) pwdResetCache.evict(request.getEmail());
+        Cache userInitCacheRef = cacheManager.getCache("userInitCache");
+        if (userInitCacheRef != null) userInitCacheRef.evict(user.getId());
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("Password reset successfully")
                 .build();
     }
 

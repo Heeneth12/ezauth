@@ -25,6 +25,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Boolean existsByEmail(String email);
 
+    long countByTenant_IdAndIsActive(Long tenantId, Boolean isActive);
+
     @Query(value = """
             SELECT 
                 u.id, 

@@ -3,6 +3,7 @@ package com.ezh.ezauth.tenant.controller;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -39,8 +40,8 @@ public class TenantController {
         return ResponseResource.success(HttpStatus.OK, response, "Bulk tenants fetched successfully");
     }
 
-    @PostMapping(value = "/{tenantId}/update", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> updateTenant(@PathVariable Long tenantId, @RequestBody TenantRegistrationRequest request) throws CommonException {
+    @PutMapping(value = "/{tenantId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateTenant(@PathVariable Long tenantId, @Valid @RequestBody TenantRegistrationRequest request) throws CommonException {
         log.info("Entered updateTenant details with : {}", request);
         CommonResponse response = tenantService.updateTenant(tenantId, request);
         return ResponseResource.success(HttpStatus.OK, response, "Tenants updated successfully");
@@ -95,6 +96,30 @@ public class TenantController {
         log.info("Updating address {} for tenant ID: {}", addressId, tenantId);
         CommonResponse response = tenantService.updateTenantAddress(tenantId, addressId, request);
         return ResponseResource.success(HttpStatus.OK, response, "Tenant address updated successfully");
+    }
+
+    @GetMapping(value = "/current", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<TenantDto> getCurrentTenant() throws CommonException {
+        log.info("Fetching current tenant");
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+        TenantDto response = tenantService.getTenantById(tenantId);
+        return ResponseResource.success(HttpStatus.OK, response, "Current tenant fetched successfully");
+    }
+
+    @PutMapping(value = "/{tenantId}/toggle-status", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> toggleTenantStatus(@PathVariable Long tenantId) throws CommonException {
+        log.info("Toggling status for tenant ID: {}", tenantId);
+        CommonResponse response = tenantService.toggleTenantStatus(tenantId);
+        return ResponseResource.success(HttpStatus.OK, response, response.getMessage());
+    }
+
+    @DeleteMapping(value = "/{tenantId}/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteTenantAddress(
+            @PathVariable Long tenantId,
+            @PathVariable Long addressId) throws CommonException {
+        log.info("Deleting address {} for tenant ID: {}", addressId, tenantId);
+        CommonResponse response = tenantService.deleteTenantAddress(tenantId, addressId);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant address deleted successfully");
     }
 
 }
