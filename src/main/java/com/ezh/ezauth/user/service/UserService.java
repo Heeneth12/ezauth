@@ -424,6 +424,47 @@ public class UserService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public Set<UserAddressDto> getUserAddresses(Long userId) throws CommonException {
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getAddresses() == null) {
+            return Collections.emptySet();
+        }
+
+        return user.getAddresses().stream()
+                .map(this::mapToAddressDto)
+                .collect(Collectors.toSet());
+    }
+
+    @Transactional
+    @CacheEvict(value = "userInitCache", key = "#userId")
+    public CommonResponse deleteUserAddress(Long userId, Long addressId) throws CommonException {
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getAddresses() == null || user.getAddresses().isEmpty()) {
+            throw new CommonException("No addresses found for this user", HttpStatus.NOT_FOUND);
+        }
+
+        UserAddress addressToDelete = user.getAddresses().stream()
+                .filter(a -> a.getId() != null && a.getId().equals(addressId))
+                .findFirst()
+                .orElseThrow(() -> new CommonException("Address not found", HttpStatus.NOT_FOUND));
+
+        user.getAddresses().remove(addressToDelete);
+        userRepository.save(user);
+
+        return CommonResponse.builder()
+                .id(userId.toString())
+                .message("Address deleted successfully")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
     /**
      * Syncs Roles: Removes unselected, Adds new ones.
      */

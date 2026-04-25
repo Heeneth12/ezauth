@@ -334,6 +334,56 @@ public class TenantService {
     }
 
     @Transactional
+    public CommonResponse toggleTenantStatus(Long tenantId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        boolean deactivating = Boolean.TRUE.equals(tenant.getIsActive());
+        if (deactivating) {
+            long activeUserCount = userRepository.countByTenant_IdAndIsActive(tenantId, true);
+            if (activeUserCount > 0) {
+                throw new CommonException(
+                        "Cannot deactivate tenant with " + activeUserCount + " active user(s). Deactivate all users first.",
+                        HttpStatus.CONFLICT);
+            }
+        }
+
+        tenant.setIsActive(!tenant.getIsActive());
+        tenantRepository.save(tenant);
+
+        String statusLabel = Boolean.TRUE.equals(tenant.getIsActive()) ? "Active" : "Inactive";
+        return CommonResponse.builder()
+                .id(tenantId.toString())
+                .status(Status.SUCCESS)
+                .message("Tenant status toggled. Current status: " + statusLabel)
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse deleteTenantAddress(Long tenantId, Long addressId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (tenant.getAddresses() == null || tenant.getAddresses().isEmpty()) {
+            throw new CommonException("No addresses found for this tenant", HttpStatus.NOT_FOUND);
+        }
+
+        TenantAddress addressToDelete = tenant.getAddresses().stream()
+                .filter(a -> a.getId() != null && a.getId().equals(addressId))
+                .findFirst()
+                .orElseThrow(() -> new CommonException("Address not found for this tenant", HttpStatus.NOT_FOUND));
+
+        tenant.getAddresses().remove(addressToDelete);
+        tenantRepository.save(tenant);
+
+        return CommonResponse.builder()
+                .id(addressId.toString())
+                .status(Status.SUCCESS)
+                .message("Tenant address deleted successfully")
+                .build();
+    }
+
+    @Transactional
     public CommonResponse updateTenant(Long tenantId, TenantRegistrationRequest request) {
 
         Tenant tenant = tenantRepository.findById(tenantId)

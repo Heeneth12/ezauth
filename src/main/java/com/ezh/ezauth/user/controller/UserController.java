@@ -1,7 +1,9 @@
 package com.ezh.ezauth.user.controller;
 
 import com.ezh.ezauth.user.dto.CreateUserRequest;
+import com.ezh.ezauth.utils.UserContextUtil;
 import jakarta.validation.Valid;
+import java.util.Set;
 import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.dto.UserFilter;
 import com.ezh.ezauth.user.dto.UserMiniDto;
@@ -97,5 +99,29 @@ public class UserController {
         log.info("Updating address for user with ID: {} and addressId: {}", userId, addressId);
         CommonResponse response = userService.updateUserAddress(userId, addressId, request);
         return ResponseResource.success(HttpStatus.OK, response, "User address updated successfully");
+    }
+
+    @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<UserDto> getCurrentUser() throws CommonException {
+        log.info("Fetching current user profile");
+        Long userId = UserContextUtil.getUserIdOrThrow();
+        UserDto response = userService.getUserById(userId, true);
+        return ResponseResource.success(HttpStatus.OK, response, "Current user fetched successfully");
+    }
+
+    @GetMapping(value = "/{userId}/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Set<UserAddressDto>> getUserAddresses(@PathVariable Long userId) throws CommonException {
+        log.info("Fetching addresses for user ID: {}", userId);
+        Set<UserAddressDto> response = userService.getUserAddresses(userId);
+        return ResponseResource.success(HttpStatus.OK, response, "User addresses fetched successfully");
+    }
+
+    @DeleteMapping(value = "/{userId}/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteUserAddress(
+            @PathVariable Long userId,
+            @PathVariable Long addressId) throws CommonException {
+        log.info("Deleting address {} for user ID: {}", addressId, userId);
+        CommonResponse response = userService.deleteUserAddress(userId, addressId);
+        return ResponseResource.success(HttpStatus.OK, response, "Address deleted successfully");
     }
 }
