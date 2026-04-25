@@ -32,7 +32,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import java.util.Collections;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.util.Collections;
 
 @Slf4j
 @Service
@@ -62,7 +61,11 @@ public class AuthService {
 
         // Fetch user
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CommonException("Invalid credentials", HttpStatus.UNAUTHORIZED));
+
+        if (!user.getIsActive()) {
+            throw new CommonException("Account is inactive. Contact your administrator.", HttpStatus.FORBIDDEN);
+        }
 
         if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
             throw new CommonException("Your organization's subscription has expired or is inactive. Please contact support.", HttpStatus.FORBIDDEN);
@@ -97,7 +100,7 @@ public class AuthService {
 
         // Validate refresh token
         if (!jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
-            throw new RuntimeException("Invalid refresh token");
+            throw new CommonException("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
         }
 
         // Get user ID from refresh token
@@ -105,7 +108,7 @@ public class AuthService {
 
         // Fetch user
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         // Subscription Validation Check (in case it expired while they were logged in)
         if (!subscriptionService.hasValidSubscription(user.getTenant().getId())) {
@@ -130,7 +133,8 @@ public class AuthService {
                 .builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
-                .message("")
+                .tokenType("Bearer")
+                .message("Token refreshed successfully")
                 .build();
     }
 

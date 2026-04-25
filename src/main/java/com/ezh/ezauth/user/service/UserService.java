@@ -54,10 +54,10 @@ public class UserService {
 
     public UserInitResponse getUserInitDetails(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         if (!user.getIsActive()) {
-            throw new IllegalStateException("User account is inactive");
+            throw new CommonException("Account is inactive. Contact your administrator.", HttpStatus.FORBIDDEN);
         }
 
         Set<UserApplicationDto> applicationDtos = user.getUserApplications().stream()
