@@ -308,6 +308,31 @@ public class TenantService {
                 .orElse("");
     }
 
+    @Transactional(readOnly = true)
+    public CommonResponse resendOtp(Long tenantId) throws CommonException {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        if (Boolean.TRUE.equals(tenant.getIsVerify())) {
+            throw new CommonException("Tenant is already verified", HttpStatus.CONFLICT);
+        }
+
+        User admin = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
+                .orElseThrow(() -> new CommonException("Admin user not found", HttpStatus.NOT_FOUND));
+
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        if (otpCacheRef != null) {
+            otpCacheRef.put("otp:tenant:" + tenantId, otp);
+        }
+        emailService.sendOtpEmail(admin.getEmail(), otp);
+
+        return CommonResponse.builder()
+                .status(Status.SUCCESS)
+                .message("OTP resent successfully")
+                .build();
+    }
+
     @Transactional
     public CommonResponse updateTenant(Long tenantId, TenantRegistrationRequest request) {
 

@@ -107,6 +107,13 @@ public class AuthController {
         return ResponseResource.success(HttpStatus.OK, response, "Password reset successfully");
     }
 
+    @PostMapping(value = "/resend-otp", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> resendOtp(@Valid @RequestBody ResendOtpRequest request) throws CommonException {
+        log.info("Resending OTP for tenantId: {}", request.getTenantId());
+        CommonResponse response = tenantService.resendOtp(request.getTenantId());
+        return ResponseResource.success(HttpStatus.OK, response, "OTP resent successfully");
+    }
+
     @PostMapping(value = "/verifyTenant", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<AuthResponse>  verifyTenant(@RequestParam Long tenantId, @RequestParam String otp) throws CommonException {
         log.info("verify tenant email ID: {}", tenantId);
