@@ -30,6 +30,8 @@ import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.UserRoleRepository;
 import com.ezh.ezauth.utils.EmailService;
 import com.ezh.ezauth.utils.common.CommonResponse;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +68,7 @@ public class TenantService {
     private final SubscriptionRepository subscriptionRepository;
     private final TenantDetailsRepository detailsRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final CacheManager cacheManager;
 
 
     @Transactional
@@ -215,6 +218,10 @@ public class TenantService {
                 .build();
 
         String otp = String.format("%06d", new Random().nextInt(999999));
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        if (otpCacheRef != null) {
+            otpCacheRef.put("otp:tenant:" + tenant.getId(), otp);
+        }
         emailService.sendOtpEmail(adminUser.getEmail(), otp);
 
         userRoleRepository.save(userRole);
@@ -233,22 +240,40 @@ public class TenantService {
 
 
     @Transactional
-    public AuthResponse verifyTenantEmail(Long tenantId, String otp) {
+    public AuthResponse verifyTenantEmail(Long tenantId, String otp) throws CommonException {
 
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
-        // Fetch user
-        User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
-                .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
+        if (Boolean.TRUE.equals(tenant.getIsVerify())) {
+            throw new CommonException("Tenant already verified", HttpStatus.CONFLICT);
+        }
+
+        Cache otpCacheRef = cacheManager.getCache("otpCache");
+        String cachedOtp = otpCacheRef != null
+                ? otpCacheRef.get("otp:tenant:" + tenantId, String.class)
+                : null;
+
+        if (cachedOtp == null) {
+            throw new CommonException("OTP has expired or was not found. Please request a new OTP.", HttpStatus.GONE);
+        }
+
+        if (!cachedOtp.equals(otp)) {
+            throw new CommonException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        if (otpCacheRef != null) {
+            otpCacheRef.evict("otp:tenant:" + tenantId);
+        }
 
         tenant.setIsVerify(true);
         tenantRepository.save(tenant);
 
-        // Extract roles as comma-separated string
+        User user = userRepository.findByEmail(tenant.getTenantAdmin().getEmail())
+                .orElseThrow(() -> new CommonException("Admin user not found", HttpStatus.NOT_FOUND));
+
         String roles = extractUserRoles(user);
 
-        // Generate tokens
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
@@ -262,7 +287,7 @@ public class TenantService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .message("Success")
+                .message("Email verified successfully")
                 .build();
     }
 
