@@ -42,12 +42,20 @@ public class SubscriptionService {
         SubscriptionPlan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new CommonException("Plan not found with id: " + planId, HttpStatus.BAD_REQUEST));
 
+        subscriptionRepository.findPrimaryActiveSubscription(tenantId, SubscriptionStatus.ACTIVE)
+                .ifPresent(oldSub -> {
+                    oldSub.setIsPrimary(false);
+                    oldSub.setStatus(SubscriptionStatus.EXPIRED);
+                    subscriptionRepository.save(oldSub);
+                });
+
         // Create new subscription
         LocalDateTime now = LocalDateTime.now();
         Subscription subscription = Subscription.builder()
                 .tenant(tenant)
                 .plan(plan)
                 .status(SubscriptionStatus.ACTIVE)
+                .isPrimary(true)
                 .startDate(now)
                 .endDate(now.plusDays(plan.getDurationDays()))
                 .autoRenew(true)
@@ -131,8 +139,8 @@ public class SubscriptionService {
     /**
      * Checks if the given tenant has an active and unexpired subscription.
      */
-    public boolean hasValidSubscription(Long tenantId) {
-        return subscriptionRepository.findValidSubscriptionByTenantId(tenantId).isPresent();
+    public Boolean hasValidSubscription(Long tenantId) {
+        return subscriptionRepository.findValidSubscription(tenantId, SubscriptionStatus.ACTIVE, LocalDateTime.now()).isPresent();
     }
 
     // Helper mapper
