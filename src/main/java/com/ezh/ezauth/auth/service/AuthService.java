@@ -16,6 +16,7 @@ import com.ezh.ezauth.user.entity.UserRole;
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.EmailService;
+import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -28,6 +29,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,18 +62,19 @@ public class AuthService {
 
 
     @Transactional(readOnly = true)
-    public AuthResponse signIn(SignInRequest request) {
-        // Authenticate user
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
-
+    public AuthResponse signIn(SignInRequest request)  throws CommonException{
         // Fetch user
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new CommonException("Invalid credentials", HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() -> new CommonException("Invalid Email", HttpStatus.UNAUTHORIZED));
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            // If email was right but password was wrong
+            throw new CommonException("Invalid password", HttpStatus.UNAUTHORIZED);
+        }
 
         if (!user.getIsActive()) {
             throw new CommonException("Account is inactive. Contact your administrator.", HttpStatus.FORBIDDEN);

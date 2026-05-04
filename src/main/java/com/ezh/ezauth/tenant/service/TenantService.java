@@ -121,6 +121,7 @@ public class TenantService {
                 .plan(defaultPlan)
                 .status(SubscriptionStatus.ACTIVE)
                 .startDate(now)
+                .isPrimary(true)
                 .endDate(now.plusDays(defaultPlan.getDurationDays()))
                 .autoRenew(false)
                 .build();

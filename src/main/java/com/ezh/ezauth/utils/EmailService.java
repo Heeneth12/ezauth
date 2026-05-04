@@ -67,6 +67,30 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendSupportAcknowledgmentEmail(String to, String contactName, String ticketRef, String subjectRequest) {
+        try {
+            Context context = new Context();
+
+            // Smart fallback if they didn't provide a name
+            String displayName = (contactName != null && !contactName.trim().isEmpty()) ? contactName : "there";
+
+            context.setVariable("name", displayName);
+            context.setVariable("ticketRef", ticketRef);
+            context.setVariable("subjectRequest", subjectRequest);
+            context.setVariable("supportUrl", "https://kubee.in/support");
+
+            String htmlBody = templateEngine.process("email-support-ack", context);
+
+            // Subject looks like: Request Received: [TICKET-UUID] - Issue signing in
+            String mailSubject = String.format("Request Received: [%s] - %s", ticketRef.substring(0, 8).toUpperCase(), subjectRequest);
+
+            sendHtmlMessage(to, mailSubject, htmlBody);
+        } catch (MessagingException e) {
+            log.error("Failed to send support acknowledgment email to {}", to, e);
+        }
+    }
+
     private void sendHtmlMessage(String to, String subject, String htmlBody) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         // MULTIPART_MODE_MIXED_RELATED is best for HTML + Images

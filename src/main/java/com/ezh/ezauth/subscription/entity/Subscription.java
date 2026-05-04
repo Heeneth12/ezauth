@@ -46,6 +46,10 @@ public class Subscription {
     @Builder.Default
     private Boolean autoRenew = false;
 
+    @Column(name = "is_primary")
+    @Builder.Default
+    private Boolean isPrimary = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
