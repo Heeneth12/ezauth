@@ -62,7 +62,11 @@ public class SecurityConfig {
 
         config.setAllowedOrigins(List.of(
                 "https://www.ez-hub.in",
+                "https://kubee.in/"
+                "https://www.kubee.in/"
                 "https://app.ez-hub.in",
+                "https://www.app.kubee.in/"
+                "https://app.kubee.in/"
                 "https://ez-inventory.onrender.com",
                 "http://localhost:8085",
                 "http://localhost:3000",
