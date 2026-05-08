@@ -90,8 +90,10 @@ public class AuthService {
         // Generate tokens
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
+                user.getUserUuid(),
                 user.getEmail(),
                 user.getTenant().getId(),
+                user.getTenant().getTenantUuid(),
                 user.getUserType().name(),
                 roles
         );
@@ -134,8 +136,10 @@ public class AuthService {
         // Generate new access token
         String newAccessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
+                user.getUserUuid(),
                 user.getEmail(),
                 user.getTenant().getId(),
+                user.getTenant().getTenantUuid(),
                 user.getUserType().name(),
                 roles
         );
@@ -303,8 +307,10 @@ public class AuthService {
             //Generate Tokens
             String accessToken = jwtTokenProvider.generateAccessToken(
                     user.getId(),
+                    user.getUserUuid(),
                     user.getEmail(),
                     user.getTenant().getId(),
+                    user.getTenant().getTenantUuid(),
                     user.getUserType().name(),
                     roles
             );
