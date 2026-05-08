@@ -277,8 +277,10 @@ public class TenantService {
 
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
+                user.getUserUuid(),
                 user.getEmail(),
                 user.getTenant().getId(),
+                user.getTenant().getTenantUuid(),
                 user.getUserType().name(),
                 roles
         );

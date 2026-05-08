@@ -87,7 +87,7 @@ public class AuthController {
     @PostMapping(value = "/signout", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> signout(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) throws CommonException {
-        log.info("Entered signout");
+        log.info("Entered sign out");
         String token = bearerToken.startsWith("Bearer ") ? bearerToken.substring(7) : bearerToken;
         CommonResponse response = authService.signout(token);
         return ResponseResource.success(HttpStatus.OK, response, "Signed out successfully");

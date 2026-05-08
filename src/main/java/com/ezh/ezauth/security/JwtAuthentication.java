@@ -14,16 +14,20 @@ import java.util.stream.Collectors;
 public class JwtAuthentication extends AbstractAuthenticationToken {
 
     private final Long userId;
+    private final String userUuid;
     private final String email;
     private final Long tenantId;
+    private final String tenantUuid;
     private final String userType;
     private final String roles;
 
-    public JwtAuthentication(Long userId, String email, Long tenantId, String userType, String roles) {
+    public JwtAuthentication(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles) {
         super(parseAuthorities(roles));
         this.userId = userId;
+        this.userUuid = userUuid;
         this.email = email;
         this.tenantId = tenantId;
+        this.tenantUuid = tenantUuid;
         this.userType = userType;
         this.roles = roles;
         setAuthenticated(true);
@@ -34,13 +38,13 @@ public class JwtAuthentication extends AbstractAuthenticationToken {
             return Collections.emptyList();
         }
         return Arrays.stream(roles.split(","))
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.trim()))
                 .collect(Collectors.toList());
     }
 
     @Override
     public Object getCredentials() {
-        return null; // token already validated
+        return null; // JWT token already validated by the filter
     }
 
     @Override
