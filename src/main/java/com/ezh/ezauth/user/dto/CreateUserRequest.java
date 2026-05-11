@@ -32,6 +32,8 @@ public class CreateUserRequest {
     @NotNull(message = "User type is required")
     private UserType userType;
 
+    private Long branchId;
+
     private Set<Long> roleIds;
     private Set<Long> applicationIds;
     private List<PrivilegeAssignRequest> privilegeMapping;

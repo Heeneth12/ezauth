@@ -32,10 +32,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 u.id, 
                 u.user_type as userType, 
                 u.user_uuid as userUuid, 
+                u.branch_id as branchId,
+                b.branch_name as branchName,
                 u.full_name as fullName,
                 u.email as email,
                 u.phone as phone
             FROM users u 
+            LEFT JOIN tenant_branches b ON b.id = u.branch_id
             WHERE u.id IN (:userIds)
             """, nativeQuery = true)
     List<UserMiniProjection> findUserMini(@Param("userIds") List<Long> userIds);
@@ -46,6 +49,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
                 SELECT u FROM User u
                 WHERE (:tenantId IS NULL OR u.tenant.id = :tenantId)
+                AND (:branchId IS NULL OR u.branch.id = :branchId)
                 AND (:userId IS NULL OR u.id = :userId)
                 AND (:userUuid IS NULL OR u.userUuid = :userUuid)
                 AND (:email IS NULL OR LOWER(u.email) = :email)
@@ -61,6 +65,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     Page<User> findUsersWithAllFilters(
             @Param("tenantId") Long tenantId,
+            @Param("branchId") Long branchId,
             @Param("userId") Long userId,
             @Param("userUuid") String userUuid,
             @Param("email") String email,

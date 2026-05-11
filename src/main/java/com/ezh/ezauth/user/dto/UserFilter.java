@@ -12,6 +12,7 @@ import java.util.List;
 @Builder
 public class UserFilter {
     private Long tenantId;
+    private Long branchId;
     private Long userId;
     private String userUuid;
     private String email;

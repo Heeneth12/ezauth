@@ -22,6 +22,9 @@ public class UserInitResponse {
     private Boolean isActive = true;
     private long tenantId;
     private String tenantName;
+    private Long branchId;
+    private String branchName;
+    private String branchCode;
     private Set<UserApplicationDto> userApplications;
     private Set<String> userRoles;
 }

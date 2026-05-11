@@ -35,6 +35,11 @@ public class UserContextUtil {
         return auth != null ? auth.getEmail() : null;
     }
 
+    public static Long getBranchId() {
+        JwtAuthentication auth = getAuth();
+        return auth != null ? auth.getBranchId() : null;
+    }
+
 
     public static Long getTenantIdOrThrow() throws CommonException {
         Long tenantId = getTenantId();

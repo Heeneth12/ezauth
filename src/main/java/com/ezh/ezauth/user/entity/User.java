@@ -1,6 +1,7 @@
 package com.ezh.ezauth.user.entity;
 
 import com.ezh.ezauth.tenant.entity.Tenant;
+import com.ezh.ezauth.tenant.entity.TenantBranch;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -58,6 +59,10 @@ public class User {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private TenantBranch branch;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserApplication> userApplications;

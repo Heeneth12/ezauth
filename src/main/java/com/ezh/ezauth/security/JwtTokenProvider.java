@@ -32,7 +32,7 @@ public class JwtTokenProvider {
     /**
      * Generate Access Token - Now includes UUIDs
      */
-    public String generateAccessToken(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles) {
+    public String generateAccessToken(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, Long branchId, String userType, String roles) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
@@ -43,6 +43,7 @@ public class JwtTokenProvider {
                         "email", email,
                         "tenantId", String.valueOf(tenantId),
                         "tenantUuid", tenantUuid,
+                        "branchId", branchId != null ? String.valueOf(branchId) : "",
                         "userType", userType,
                         "roles", roles,
                         "type", "ACCESS"
@@ -86,6 +87,11 @@ public class JwtTokenProvider {
 
     public String getTenantUuidFromToken(String token) {
         return getClaims(token).get("tenantUuid", String.class);
+    }
+
+    public Long getBranchIdFromToken(String token) {
+        String branchId = getClaims(token).get("branchId", String.class);
+        return branchId != null && !branchId.isBlank() ? Long.valueOf(branchId) : null;
     }
 
     public String getEmailFromToken(String token) {
