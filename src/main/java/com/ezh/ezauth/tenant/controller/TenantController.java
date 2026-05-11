@@ -1,5 +1,6 @@
 package com.ezh.ezauth.tenant.controller;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
 import com.ezh.ezauth.user.dto.UserDto;
@@ -82,7 +83,7 @@ public class TenantController {
     @PostMapping(value = "/{tenantId}/address", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> createTenantAddress(
             @PathVariable Long tenantId,
-            @Valid @RequestBody TenantAddressDto request) throws CommonException {
+            @Valid @RequestBody AddressDto request) throws CommonException {
         log.info("Creating address for tenant ID: {}", tenantId);
         CommonResponse response = tenantService.createTenantAddress(tenantId, request);
         return ResponseResource.success(HttpStatus.CREATED, response, "Tenant address created successfully");
@@ -92,7 +93,7 @@ public class TenantController {
     public ResponseResource<CommonResponse> updateTenantAddress(
             @PathVariable Long tenantId,
             @PathVariable Long addressId,
-            @Valid @RequestBody TenantAddressDto request) throws CommonException {
+            @Valid @RequestBody AddressDto request) throws CommonException {
         log.info("Updating address {} for tenant ID: {}", addressId, tenantId);
         CommonResponse response = tenantService.updateTenantAddress(tenantId, addressId, request);
         return ResponseResource.success(HttpStatus.OK, response, "Tenant address updated successfully");

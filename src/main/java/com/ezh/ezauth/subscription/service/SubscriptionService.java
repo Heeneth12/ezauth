@@ -61,14 +61,10 @@ public class SubscriptionService {
                 .autoRenew(true)
                 .build();
 
-        subscription = subscriptionRepository.save(subscription);
-
-        // Update Tenant's current subscription reference
-        tenant.setCurrentSubscription(subscription);
-        tenant = tenantRepository.save(tenant);
+        subscriptionRepository.save(subscription);
 
         return CommonResponse.builder()
-                .id(tenant.getId().toString())
+                .id(tenantId.toString())
                 .status(Status.SUCCESS)
                 .message("Tenant subscribed successfully")
                 .build();
@@ -76,13 +72,15 @@ public class SubscriptionService {
 
     @Transactional(readOnly = true)
     public SubscriptionDto getTenantSubscription(Long tenantId) throws CommonException {
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new CommonException("Tenant not found with id: " + tenantId, HttpStatus.BAD_REQUEST));
-
-        if (tenant.getCurrentSubscription() == null) {
-            throw new CommonException("No active subscription found for tenant.", HttpStatus.BAD_REQUEST);
+        if (!tenantRepository.existsById(tenantId)) {
+            throw new CommonException("Tenant not found with id: " + tenantId, HttpStatus.BAD_REQUEST);
         }
-        return mapToDto(tenant.getCurrentSubscription());
+
+        Subscription subscription = subscriptionRepository
+                .findPrimaryActiveSubscription(tenantId, SubscriptionStatus.ACTIVE)
+                .orElseThrow(() -> new CommonException("No active subscription found for tenant.", HttpStatus.BAD_REQUEST));
+
+        return mapToDto(subscription);
     }
 
     @Transactional

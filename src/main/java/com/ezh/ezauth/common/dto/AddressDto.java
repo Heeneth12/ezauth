@@ -1,4 +1,4 @@
-package com.ezh.ezauth.tenant.dto;
+package com.ezh.ezauth.common.dto;
 
 import com.ezh.ezauth.common.entity.AddressType;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TenantAddressDto {
+public class AddressDto {
 
     private Long id;
 
@@ -36,4 +36,6 @@ public class TenantAddressDto {
 
     @NotNull(message = "Address Type is required")
     private AddressType type;
+
+    private Boolean isPrimary;
 }

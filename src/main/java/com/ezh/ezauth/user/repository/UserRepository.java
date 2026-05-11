@@ -27,6 +27,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     long countByTenant_IdAndIsActive(Long tenantId, Boolean isActive);
 
+    long countByBranch_Id(Long branchId);
+
     @Query(value = """
             SELECT 
                 u.id, 

@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.entity;
 
+import com.ezh.ezauth.branch.entity.Branch;
 import com.ezh.ezauth.common.entity.Role;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,6 +30,11 @@ public class UserRole {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
+
+    // Branch-scoped role — null means tenant-wide role
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
 
     @Column(nullable = false)
     private Boolean isActive = true;

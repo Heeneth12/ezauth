@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.controller;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.user.dto.CreateUserRequest;
 import com.ezh.ezauth.utils.UserContextUtil;
 import jakarta.validation.Valid;
@@ -7,7 +8,6 @@ import java.util.Set;
 import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.user.dto.UserFilter;
 import com.ezh.ezauth.user.dto.UserMiniDto;
-import com.ezh.ezauth.user.dto.UserAddressDto;
 import com.ezh.ezauth.user.service.UserService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
@@ -88,14 +88,14 @@ public class UserController {
     }
 
     @PostMapping(value = "/{userId}/address", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> addUserAddress(@PathVariable Long userId, @RequestBody UserAddressDto request) throws CommonException {
+    public ResponseResource<CommonResponse> addUserAddress(@PathVariable Long userId, @RequestBody AddressDto request) throws CommonException {
         log.info("Adding address for user with ID: {}", userId);
         CommonResponse response = userService.addUserAddress(userId, request);
         return ResponseResource.success(HttpStatus.CREATED, response, "User address created successfully");
     }
 
     @PutMapping(value = "/{userId}/address/{addressId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<CommonResponse> updateUserAddress(@PathVariable Long userId, @PathVariable Long addressId, @RequestBody UserAddressDto request) throws CommonException {
+    public ResponseResource<CommonResponse> updateUserAddress(@PathVariable Long userId, @PathVariable Long addressId, @RequestBody AddressDto request) throws CommonException {
         log.info("Updating address for user with ID: {} and addressId: {}", userId, addressId);
         CommonResponse response = userService.updateUserAddress(userId, addressId, request);
         return ResponseResource.success(HttpStatus.OK, response, "User address updated successfully");
@@ -110,9 +110,9 @@ public class UserController {
     }
 
     @GetMapping(value = "/{userId}/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseResource<Set<UserAddressDto>> getUserAddresses(@PathVariable Long userId) throws CommonException {
+    public ResponseResource<Set<AddressDto>> getUserAddresses(@PathVariable Long userId) throws CommonException {
         log.info("Fetching addresses for user ID: {}", userId);
-        Set<UserAddressDto> response = userService.getUserAddresses(userId);
+        Set<AddressDto> response = userService.getUserAddresses(userId);
         return ResponseResource.success(HttpStatus.OK, response, "User addresses fetched successfully");
     }
 

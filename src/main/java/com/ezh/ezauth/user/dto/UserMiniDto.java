@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.dto;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,5 +19,5 @@ public class UserMiniDto {
     private String name;
     private String email;
     private String phone;
-    private List<UserAddressDto> userAddresses;
+    private List<AddressDto> userAddresses;
 }

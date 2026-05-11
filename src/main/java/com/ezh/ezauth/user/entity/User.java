@@ -1,15 +1,18 @@
 package com.ezh.ezauth.user.entity;
 
+import com.ezh.ezauth.branch.entity.Branch;
+import com.ezh.ezauth.common.entity.Address;
 import com.ezh.ezauth.tenant.entity.Tenant;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
-
 
 @Entity
 @Table(name = "users")
@@ -24,8 +27,8 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_uuid", nullable = false)
-    private  String userUuid;
+    @Column(name = "user_uuid", nullable = false, unique = true, updatable = false)
+    private String userUuid;
 
     @Column(name = "full_name", nullable = false)
     private String fullName;
@@ -42,8 +45,11 @@ public class User {
     @Column(name = "profile_picture_uuid")
     private String profilePictureUuid;
 
+    // User type
+    // TENANT_ADMIN → branch must be null (enforced by DB CHECK + service layer)
+    // Others       → branch must be set
     @Enumerated(EnumType.STRING)
-    @Column(name = "user_type", nullable = false, length = 50)
+    @Column(name = "user_type", nullable = false, length = 20)
     private UserType userType;
 
     @Builder.Default
@@ -54,19 +60,40 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Relationship: Many users belong to one tenant
+    // Tenant
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    // Branch
+    // NULL  = TENANT_ADMIN (no branch scope)
+    // SET   = branch-scoped user (BRANCH_MANAGER / STAFF / GUEST)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+
+    // Application access
+    // Each entry = one app this user can access + their privilege list
+    @OneToMany(mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
     private Set<UserApplication> userApplications;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    // Role assignments (template only, not runtime enforced)
+    @OneToMany(mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
     private Set<UserRole> userRoles;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<UserAddress> addresses;
+    // Addresses (polymorphic)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "entity_id",
+            insertable = false, updatable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @SQLRestriction("entity_type = 'USER'")
+    private Set<Address> addresses;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

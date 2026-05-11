@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.dto;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import lombok.*;
 
 import java.util.List;
@@ -23,7 +24,7 @@ public class UserDto {
     private Set<String> roles;
     private List<UserRoleDto> userRoles;
     private Set<Long> applicationIds;
-    private Set<UserAddressDto> addresses;
+    private Set<AddressDto> addresses;
     private List<UserAppEditDto> userApplications;
 
     @Getter

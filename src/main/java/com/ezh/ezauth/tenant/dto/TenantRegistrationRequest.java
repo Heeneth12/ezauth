@@ -1,6 +1,7 @@
 package com.ezh.ezauth.tenant.dto;
 
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.tenant.entity.BusinessType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -39,5 +40,5 @@ public class TenantRegistrationRequest {
     @NotNull(message = "Application key is required")
     private String appKey;
 
-    private TenantAddressDto address;
+    private AddressDto address;
 }
