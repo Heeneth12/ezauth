@@ -1,12 +1,16 @@
 package com.ezh.ezauth.common.controller;
 
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.common.dto.ApplicationDto;
 import com.ezh.ezauth.common.dto.RoleDto;
+import com.ezh.ezauth.common.entity.EntityType;
+import com.ezh.ezauth.common.service.AddressService;
 import com.ezh.ezauth.common.service.CommonService;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +26,7 @@ import java.util.List;
 public class CommonController {
 
     private final CommonService commonService;
+    private final AddressService addressService;
 
     @GetMapping(value = "/app/all", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<List<ApplicationDto>> getAllApplication() throws CommonException {
@@ -63,5 +68,55 @@ public class CommonController {
         log.info("Entered get privileges for moduleId: {}", moduleId);
         Object response = new Object();
         return ResponseResource.success(HttpStatus.OK, response, "Privileges fetched successfully");
+    }
+
+    // ─── Address APIs ────────────────────────────────────────────────────────
+
+    @GetMapping(value = "/address/types", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<String>> getAddressTypes() {
+        return ResponseResource.success(HttpStatus.OK, addressService.getAddressTypes(), "Address types fetched successfully");
+    }
+
+    @GetMapping(value = "/address/{entityType}/{entityId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<AddressDto>> getAddresses(
+            @PathVariable EntityType entityType,
+            @PathVariable Long entityId) throws CommonException {
+        log.info("Fetching addresses for {}:{}", entityType, entityId);
+        return ResponseResource.success(HttpStatus.OK, addressService.getAddresses(entityType, entityId), "Addresses fetched successfully");
+    }
+
+    @GetMapping(value = "/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<AddressDto> getAddress(@PathVariable Long addressId) throws CommonException {
+        log.info("Fetching address ID: {}", addressId);
+        return ResponseResource.success(HttpStatus.OK, addressService.getAddress(addressId), "Address fetched successfully");
+    }
+
+    @PostMapping(value = "/address/{entityType}/{entityId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createAddress(
+            @PathVariable EntityType entityType,
+            @PathVariable Long entityId,
+            @Valid @RequestBody AddressDto request) throws CommonException {
+        log.info("Creating address for {}:{}", entityType, entityId);
+        return ResponseResource.success(HttpStatus.CREATED, addressService.createAddress(entityType, entityId, request), "Address created successfully");
+    }
+
+    @PutMapping(value = "/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateAddress(
+            @PathVariable Long addressId,
+            @Valid @RequestBody AddressDto request) throws CommonException {
+        log.info("Updating address ID: {}", addressId);
+        return ResponseResource.success(HttpStatus.OK, addressService.updateAddress(addressId, request), "Address updated successfully");
+    }
+
+    @PatchMapping(value = "/address/{addressId}/primary", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> setPrimaryAddress(@PathVariable Long addressId) throws CommonException {
+        log.info("Setting address {} as primary", addressId);
+        return ResponseResource.success(HttpStatus.OK, addressService.setPrimaryAddress(addressId), "Primary address updated successfully");
+    }
+
+    @DeleteMapping(value = "/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteAddress(@PathVariable Long addressId) throws CommonException {
+        log.info("Deleting address ID: {}", addressId);
+        return ResponseResource.success(HttpStatus.OK, addressService.deleteAddress(addressId), "Address deleted successfully");
     }
 }
