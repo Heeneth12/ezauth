@@ -15,6 +15,8 @@ public class UserMiniDto {
     private Long id;
     private String userType;
     private String UserUuid;
+    private Long branchId;
+    private String branchName;
     private String name;
     private String email;
     private String phone;

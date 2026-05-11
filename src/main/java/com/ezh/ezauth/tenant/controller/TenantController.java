@@ -113,6 +113,50 @@ public class TenantController {
         return ResponseResource.success(HttpStatus.OK, response, response.getMessage());
     }
 
+    @PostMapping(value = "/{tenantId}/branches", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createTenantBranch(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody TenantBranchDto request) throws CommonException {
+        log.info("Creating branch for tenant ID: {}", tenantId);
+        CommonResponse response = tenantService.createTenantBranch(tenantId, request);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Tenant branch created successfully");
+    }
+
+    @GetMapping(value = "/{tenantId}/branches", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<TenantBranchDto>> getTenantBranches(@PathVariable Long tenantId) throws CommonException {
+        log.info("Fetching branches for tenant ID: {}", tenantId);
+        List<TenantBranchDto> response = tenantService.getTenantBranches(tenantId);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant branches fetched successfully");
+    }
+
+    @GetMapping(value = "/{tenantId}/branches/{branchId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<TenantBranchDto> getTenantBranch(
+            @PathVariable Long tenantId,
+            @PathVariable Long branchId) throws CommonException {
+        log.info("Fetching branch {} for tenant ID: {}", branchId, tenantId);
+        TenantBranchDto response = tenantService.getTenantBranch(tenantId, branchId);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant branch fetched successfully");
+    }
+
+    @PutMapping(value = "/{tenantId}/branches/{branchId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateTenantBranch(
+            @PathVariable Long tenantId,
+            @PathVariable Long branchId,
+            @Valid @RequestBody TenantBranchDto request) throws CommonException {
+        log.info("Updating branch {} for tenant ID: {}", branchId, tenantId);
+        CommonResponse response = tenantService.updateTenantBranch(tenantId, branchId, request);
+        return ResponseResource.success(HttpStatus.OK, response, "Tenant branch updated successfully");
+    }
+
+    @PutMapping(value = "/{tenantId}/branches/{branchId}/toggle-status", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> toggleTenantBranchStatus(
+            @PathVariable Long tenantId,
+            @PathVariable Long branchId) throws CommonException {
+        log.info("Toggling branch {} status for tenant ID: {}", branchId, tenantId);
+        CommonResponse response = tenantService.toggleTenantBranchStatus(tenantId, branchId);
+        return ResponseResource.success(HttpStatus.OK, response, response.getMessage());
+    }
+
     @DeleteMapping(value = "/{tenantId}/address/{addressId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> deleteTenantAddress(
             @PathVariable Long tenantId,

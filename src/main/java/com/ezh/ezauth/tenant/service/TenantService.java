@@ -19,7 +19,9 @@ import com.ezh.ezauth.subscription.repository.SubscriptionRepository;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.entity.TenantAddress;
+import com.ezh.ezauth.tenant.entity.TenantBranch;
 import com.ezh.ezauth.tenant.entity.TenantDetails;
+import com.ezh.ezauth.tenant.repository.TenantBranchRepository;
 import com.ezh.ezauth.tenant.repository.TenantDetailsRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.UserDto;
@@ -67,6 +69,7 @@ public class TenantService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final TenantDetailsRepository detailsRepository;
+    private final TenantBranchRepository tenantBranchRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final CacheManager cacheManager;
 
@@ -155,6 +158,8 @@ public class TenantService {
             tenant = tenantRepository.save(tenant);
         }
 
+        TenantBranch defaultBranch = createDefaultBranch(tenant, request.getAddress());
+
         // 4. Create Admin User
         User adminUser = User.builder()
                 .fullName(request.getAdminFullName())
@@ -164,6 +169,7 @@ public class TenantService {
                 .userType(UserType.SUPER_ADMIN)
                 .isActive(true)
                 .tenant(tenant)
+                .branch(defaultBranch)
                 .build();
 
         adminUser = userRepository.save(adminUser);
@@ -281,6 +287,7 @@ public class TenantService {
                 user.getEmail(),
                 user.getTenant().getId(),
                 user.getTenant().getTenantUuid(),
+                user.getBranch() != null ? user.getBranch().getId() : null,
                 user.getUserType().name(),
                 roles
         );
@@ -383,6 +390,83 @@ public class TenantService {
                 .id(addressId.toString())
                 .status(Status.SUCCESS)
                 .message("Tenant address deleted successfully")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse createTenantBranch(Long tenantId, TenantBranchDto dto) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        String branchCode = generateBranchCode(tenant, dto);
+        if (tenantBranchRepository.existsByTenant_IdAndBranchCode(tenantId, branchCode)) {
+            throw new CommonException("Branch code already exists for this tenant", HttpStatus.CONFLICT);
+        }
+        if (tenantBranchRepository.existsByTenant_IdAndBranchNameIgnoreCase(tenantId, dto.getBranchName())) {
+            throw new CommonException("Branch name already exists for this tenant", HttpStatus.CONFLICT);
+        }
+
+        TenantBranch branch = mapDtoToBranch(dto);
+        branch.setTenant(tenant);
+        branch.setBranchCode(branchCode);
+        if (branch.getIsActive() == null) {
+            branch.setIsActive(true);
+        }
+
+        TenantBranch saved = tenantBranchRepository.save(branch);
+        return CommonResponse.builder()
+                .id(saved.getId().toString())
+                .message("Tenant branch successfully created")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TenantBranchDto> getTenantBranches(Long tenantId) {
+        if (!tenantRepository.existsById(tenantId)) {
+            throw new CommonException("Tenant not found", HttpStatus.NOT_FOUND);
+        }
+        return tenantBranchRepository.findByTenant_IdOrderByBranchNameAsc(tenantId).stream()
+                .map(this::mapBranchToDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TenantBranchDto getTenantBranch(Long tenantId, Long branchId) {
+        return tenantBranchRepository.findByIdAndTenant_Id(branchId, tenantId)
+                .map(this::mapBranchToDto)
+                .orElseThrow(() -> new CommonException("Branch not found", HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional
+    public CommonResponse updateTenantBranch(Long tenantId, Long branchId, TenantBranchDto dto) {
+        TenantBranch branch = tenantBranchRepository.findByIdAndTenant_Id(branchId, tenantId)
+                .orElseThrow(() -> new CommonException("Branch not found", HttpStatus.NOT_FOUND));
+
+        if (!branch.getBranchName().equalsIgnoreCase(dto.getBranchName())
+                && tenantBranchRepository.existsByTenant_IdAndBranchNameIgnoreCase(tenantId, dto.getBranchName())) {
+            throw new CommonException("Branch name already exists for this tenant", HttpStatus.CONFLICT);
+        }
+
+        updateBranchFromDto(branch, dto);
+        TenantBranch saved = tenantBranchRepository.save(branch);
+        return CommonResponse.builder()
+                .id(saved.getId().toString())
+                .message("Tenant branch successfully updated")
+                .status(Status.SUCCESS)
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse toggleTenantBranchStatus(Long tenantId, Long branchId) {
+        TenantBranch branch = tenantBranchRepository.findByIdAndTenant_Id(branchId, tenantId)
+                .orElseThrow(() -> new CommonException("Branch not found", HttpStatus.NOT_FOUND));
+        branch.setIsActive(!Boolean.TRUE.equals(branch.getIsActive()));
+        tenantBranchRepository.save(branch);
+        return CommonResponse.builder()
+                .id(branch.getId().toString())
+                .message("Tenant branch status toggled successfully")
+                .status(Status.SUCCESS)
                 .build();
     }
 
@@ -502,6 +586,8 @@ public class TenantService {
         subscription = subscriptionRepository.save(subscription);
         tenant.setCurrentSubscription(subscription);
 
+        TenantBranch defaultBranch = createDefaultBranch(tenant, null);
+
         // 5. Create User (No Password)
         User adminUser = User.builder()
                 .fullName(fullName)
@@ -509,6 +595,7 @@ public class TenantService {
                 .passwordHash(passwordEncoder.encode("GOOGLE_AUTH_USER"))
                 .isActive(true)
                 .tenant(tenant)
+                .branch(defaultBranch)
                 .build();
         adminUser = userRepository.save(adminUser);
 
@@ -760,6 +847,13 @@ public class TenantService {
                     .collect(Collectors.toSet());
         }
 
+        Set<TenantBranchDto> branchDtos = null;
+        if (tenant.getBranches() != null && !tenant.getBranches().isEmpty()) {
+            branchDtos = tenant.getBranches().stream()
+                    .map(this::mapBranchToDto)
+                    .collect(Collectors.toSet());
+        }
+
         // Build and Return TenantDto
         return TenantDto.builder()
                 .id(tenant.getId())
@@ -772,7 +866,8 @@ public class TenantService {
                 .tenantAdmin(adminDto)
                 .applications(applicationDtos)
                 .tenantAddress(addressDtos)
-                .tenantDetails(mapEntityToDto(tenant.getTenantDetails()))
+                .branches(branchDtos)
+                .tenantDetails(tenant.getTenantDetails() != null ? mapEntityToDto(tenant.getTenantDetails()) : null)
                 .build();
     }
 
@@ -821,6 +916,88 @@ public class TenantService {
         }
     }
 
+
+    private TenantBranch createDefaultBranch(Tenant tenant, TenantAddressDto addressDto) {
+        TenantBranch branch = TenantBranch.builder()
+                .tenant(tenant)
+                .branchName("Main Branch")
+                .branchCode(tenant.getTenantCode() + "-MAIN")
+                .contactPhone(tenant.getTenantAdmin() != null ? tenant.getTenantAdmin().getPhone() : null)
+                .isActive(true)
+                .build();
+        if (addressDto != null) {
+            branch.setAddressLine1(addressDto.getAddressLine1());
+            branch.setAddressLine2(addressDto.getAddressLine2());
+            branch.setRoute(addressDto.getRoute());
+            branch.setArea(addressDto.getArea());
+            branch.setCity(addressDto.getCity());
+            branch.setState(addressDto.getState());
+            branch.setCountry(addressDto.getCountry());
+            branch.setPinCode(addressDto.getPinCode());
+        }
+        return tenantBranchRepository.save(branch);
+    }
+
+    private TenantBranch mapDtoToBranch(TenantBranchDto dto) {
+        TenantBranch branch = TenantBranch.builder().build();
+        updateBranchFromDto(branch, dto);
+        return branch;
+    }
+
+    private void updateBranchFromDto(TenantBranch branch, TenantBranchDto dto) {
+        branch.setBranchName(dto.getBranchName());
+        branch.setDescription(dto.getDescription());
+        branch.setContactEmail(dto.getContactEmail());
+        branch.setContactPhone(dto.getContactPhone());
+        branch.setAddressLine1(dto.getAddressLine1());
+        branch.setAddressLine2(dto.getAddressLine2());
+        branch.setRoute(dto.getRoute());
+        branch.setArea(dto.getArea());
+        branch.setCity(dto.getCity());
+        branch.setState(dto.getState());
+        branch.setCountry(dto.getCountry());
+        branch.setPinCode(dto.getPinCode());
+        if (dto.getIsActive() != null) {
+            branch.setIsActive(dto.getIsActive());
+        }
+    }
+
+    private TenantBranchDto mapBranchToDto(TenantBranch branch) {
+        return TenantBranchDto.builder()
+                .id(branch.getId())
+                .branchUuid(branch.getBranchUuid())
+                .branchName(branch.getBranchName())
+                .branchCode(branch.getBranchCode())
+                .description(branch.getDescription())
+                .contactEmail(branch.getContactEmail())
+                .contactPhone(branch.getContactPhone())
+                .addressLine1(branch.getAddressLine1())
+                .addressLine2(branch.getAddressLine2())
+                .route(branch.getRoute())
+                .area(branch.getArea())
+                .city(branch.getCity())
+                .state(branch.getState())
+                .country(branch.getCountry())
+                .pinCode(branch.getPinCode())
+                .isActive(branch.getIsActive())
+                .build();
+    }
+
+    private String generateBranchCode(Tenant tenant, TenantBranchDto dto) {
+        String source = dto.getBranchCode() != null && !dto.getBranchCode().isBlank()
+                ? dto.getBranchCode()
+                : dto.getBranchName();
+        String code = source.toUpperCase()
+                .replaceAll("[^A-Z0-9]+", "-")
+                .replaceAll("^-|-$", "");
+        if (code.isBlank()) {
+            code = "BRANCH";
+        }
+        if (code.length() > 40) {
+            code = code.substring(0, 40);
+        }
+        return tenant.getTenantCode() + "-" + code;
+    }
 
     private TenantDetails mapDtoToEntity(TenantDetailsDto dto) {
         return TenantDetails.builder()

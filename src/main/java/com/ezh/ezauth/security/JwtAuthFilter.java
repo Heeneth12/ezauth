@@ -42,6 +42,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // Extract UUIDs (Assuming your JwtTokenProvider has these methods)
                 String userUuid = jwtTokenProvider.getUserUuidFromToken(token);
                 String tenantUuid = jwtTokenProvider.getTenantUuidFromToken(token);
+                Long branchId = jwtTokenProvider.getBranchIdFromToken(token);
 
                 String email = jwtTokenProvider.getEmailFromToken(token);
                 String userType = jwtTokenProvider.getUserTypeFromToken(token);
@@ -53,6 +54,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 userContext.setEmail(email);
                 userContext.setTenantId(tenantId);
                 userContext.setTenantUuid(tenantUuid);
+                userContext.setBranchId(branchId);
                 userContext.setUserType(userType);
                 userContext.setRoles(roles);
 
@@ -63,6 +65,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         email,
                         tenantId,
                         tenantUuid,
+                        branchId,
                         userType,
                         roles
                 );

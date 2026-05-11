@@ -9,6 +9,8 @@ import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.PrivilegeRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.tenant.entity.Tenant;
+import com.ezh.ezauth.tenant.entity.TenantBranch;
+import com.ezh.ezauth.tenant.repository.TenantBranchRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.*;
 import com.ezh.ezauth.user.entity.*;
@@ -44,6 +46,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final TenantBranchRepository tenantBranchRepository;
     private final ApplicationRepository applicationRepository;
     private final ModuleRepository moduleRepository;
     private final RoleRepository roleRepository;
@@ -53,7 +56,8 @@ public class UserService {
     private final CacheManager cacheManager;
 
     public UserInitResponse getUserInitDetails(Long userId) {
-        User user = userRepository.findById(userId)
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         if (!user.getIsActive()) {
@@ -87,6 +91,9 @@ public class UserService {
                 .isActive(user.getIsActive())
                 .tenantName(user.getTenant().getTenantName())
                 .tenantId(user.getTenant().getId())
+                .branchId(user.getBranch() != null ? user.getBranch().getId() : null)
+                .branchName(user.getBranch() != null ? user.getBranch().getBranchName() : null)
+                .branchCode(user.getBranch() != null ? user.getBranch().getBranchCode() : null)
                 .userApplications(applicationDtos)
                 .userRoles(roles)
                 .build();
@@ -97,6 +104,8 @@ public class UserService {
         Long tenantId = UserContextUtil.getTenantId();
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Invalid tenant", HttpStatus.BAD_REQUEST));
+
+        TenantBranch branch = resolveBranch(tenantId, request.getBranchId());
 
         boolean isLoginEnabled = !request.getUserType().equals(UserType.CUSTOMER);
 
@@ -109,6 +118,7 @@ public class UserService {
                 .userType(request.getUserType())
                 .isLoginEnabled(isLoginEnabled)
                 .tenant(tenant)
+                .branch(branch)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .userRoles(new HashSet<>())
                 .userApplications(new HashSet<>())
@@ -141,7 +151,8 @@ public class UserService {
     @Transactional
     @CacheEvict(value = "userInitCache", key = "#userId")
     public CommonResponse updateUser(Long userId, CreateUserRequest request) throws CommonException {
-        User user = userRepository.findById(userId)
+        Long tenantId = UserContextUtil.getTenantId();
+        User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
 
         // Update Basic Info
@@ -150,6 +161,7 @@ public class UserService {
         if (StringUtils.hasText(request.getPassword())) {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
+        user.setBranch(resolveBranch(tenantId, request.getBranchId()));
 
         // Delegate to sync methods
         syncUserRoles(user, request.getRoleIds());
@@ -186,6 +198,8 @@ public class UserService {
                         .id(user.getId())
                         .userType(user.getUserType().toString())
                         .UserUuid(user.getUserUuid())
+                        .branchId(user.getBranch() != null ? user.getBranch().getId() : null)
+                        .branchName(user.getBranch() != null ? user.getBranch().getBranchName() : null)
                         .name(user.getFullName())
                         .email(user.getEmail())
                         .phone(user.getPhone())
@@ -222,6 +236,8 @@ public class UserService {
                         .id(p.getId())
                         .userType(p.getUserType())
                         .UserUuid(p.getUserUuid())
+                        .branchId(p.getBranchId())
+                        .branchName(p.getBranchName())
                         .name(p.getFullName())
                         .email(p.getEmail())
                         .phone(p.getPhone())
@@ -255,7 +271,10 @@ public class UserService {
                 .isActive(user.getIsActive())
                 .userType(user.getUserType().toString())
                 .profilePictureUuid(user.getProfilePictureUuid())
-                .tenantId(user.getTenant().getId());
+                .tenantId(user.getTenant().getId())
+                .branchId(user.getBranch() != null ? user.getBranch().getId() : null)
+                .branchName(user.getBranch() != null ? user.getBranch().getBranchName() : null)
+                .branchCode(user.getBranch() != null ? user.getBranch().getBranchCode() : null);
 
         // 3. Basic Role Keys (Set<String>)
         if (user.getUserRoles() != null) {
@@ -336,6 +355,7 @@ public class UserService {
         String email = (filter != null && StringUtils.hasText(filter.getEmail())) ? filter.getEmail().trim().toLowerCase() : null;
         String search = (filter != null && StringUtils.hasText(filter.getSearchQuery())) ? filter.getSearchQuery().trim().toLowerCase() : null;
         Long tenantId = (filter != null) ? filter.getTenantId() : null;
+        Long branchId = (filter != null) ? filter.getBranchId() : null;
         Long userId = (filter != null) ? filter.getUserId() : null;
         String userUuid = (filter != null) ? filter.getUserUuid() : null;
         String phone = (filter != null) ? filter.getPhone() : null;
@@ -343,7 +363,7 @@ public class UserService {
         Boolean isActive = (filter != null) ? filter.getIsActive() : null;
 
         return userRepository
-                .findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
+                .findUsersWithAllFilters(tenantId, branchId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
                 .map(dto -> constructUserDto(dto, false)); // false for basic details only
     }
 
@@ -600,6 +620,18 @@ public class UserService {
     }
 
 
+    private TenantBranch resolveBranch(Long tenantId, Long branchId) {
+        if (branchId == null) {
+            return null;
+        }
+        TenantBranch branch = tenantBranchRepository.findByIdAndTenant_Id(branchId, tenantId)
+                .orElseThrow(() -> new CommonException("Invalid branch for tenant", HttpStatus.BAD_REQUEST));
+        if (!Boolean.TRUE.equals(branch.getIsActive())) {
+            throw new CommonException("Branch is inactive", HttpStatus.BAD_REQUEST);
+        }
+        return branch;
+    }
+
     private UserAddress mapToAddressEntity(UserAddressDto dto, User user, Tenant tenant) {
         return UserAddress.builder()
                 .user(user)
@@ -659,6 +691,10 @@ public class UserService {
         return UserDto.builder()
                 .id(user.getId())
                 .userUuid(user.getUserUuid())
+                .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
+                .branchId(user.getBranch() != null ? user.getBranch().getId() : null)
+                .branchName(user.getBranch() != null ? user.getBranch().getBranchName() : null)
+                .branchCode(user.getBranch() != null ? user.getBranch().getBranchCode() : null)
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
@@ -829,6 +865,7 @@ public class UserService {
         String email = (filter != null && StringUtils.hasText(filter.getEmail())) ? filter.getEmail().trim().toLowerCase() : null;
         String search = (filter != null && StringUtils.hasText(filter.getSearchQuery())) ? filter.getSearchQuery().trim().toLowerCase() : null;
         Long tenantId = (filter != null) ? filter.getTenantId() : null;
+        Long branchId = (filter != null) ? filter.getBranchId() : null;
         Long userId = (filter != null) ? filter.getUserId() : null;
         String userUuid = (filter != null) ? filter.getUserUuid() : null;
         String phone = (filter != null) ? filter.getPhone() : null;
@@ -836,7 +873,7 @@ public class UserService {
         Boolean isActive = (filter != null) ? filter.getIsActive() : null;
 
         return userRepository
-                .findUsersWithAllFilters(tenantId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
+                .findUsersWithAllFilters(tenantId, branchId, userId, userUuid, email, phone, search, userTypes, isActive, pageable)
                 .map(dto -> constructUserDto(dto, true));
     }
 }

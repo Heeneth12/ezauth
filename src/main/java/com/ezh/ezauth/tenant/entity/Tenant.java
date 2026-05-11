@@ -58,6 +58,9 @@ public class Tenant {
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL)
     private Set<User> users;
 
+    @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TenantBranch> branches;
+
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL)
     private Set<Role> roles;
 

@@ -94,6 +94,7 @@ public class AuthService {
                 user.getEmail(),
                 user.getTenant().getId(),
                 user.getTenant().getTenantUuid(),
+                user.getBranch() != null ? user.getBranch().getId() : null,
                 user.getUserType().name(),
                 roles
         );
@@ -140,6 +141,7 @@ public class AuthService {
                 user.getEmail(),
                 user.getTenant().getId(),
                 user.getTenant().getTenantUuid(),
+                user.getBranch() != null ? user.getBranch().getId() : null,
                 user.getUserType().name(),
                 roles
         );
@@ -311,6 +313,7 @@ public class AuthService {
                     user.getEmail(),
                     user.getTenant().getId(),
                     user.getTenant().getTenantUuid(),
+                    user.getBranch() != null ? user.getBranch().getId() : null,
                     user.getUserType().name(),
                     roles
             );

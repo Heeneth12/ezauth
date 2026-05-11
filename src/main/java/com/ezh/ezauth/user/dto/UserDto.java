@@ -13,6 +13,9 @@ import java.util.Set;
 public class UserDto {
     private Long id;
     private Long tenantId;
+    private Long branchId;
+    private String branchName;
+    private String branchCode;
     private String userUuid;
     private String fullName;
     private String email;

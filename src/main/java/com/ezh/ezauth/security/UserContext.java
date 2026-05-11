@@ -13,6 +13,7 @@ public class UserContext {
     private String email;
     private String tenantUuid;
     private Long tenantId;
+    private Long branchId;
     private String userType;
     private String roles;
 }

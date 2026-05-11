@@ -18,16 +18,18 @@ public class JwtAuthentication extends AbstractAuthenticationToken {
     private final String email;
     private final Long tenantId;
     private final String tenantUuid;
+    private final Long branchId;
     private final String userType;
     private final String roles;
 
-    public JwtAuthentication(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles) {
+    public JwtAuthentication(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, Long branchId, String userType, String roles) {
         super(parseAuthorities(roles));
         this.userId = userId;
         this.userUuid = userUuid;
         this.email = email;
         this.tenantId = tenantId;
         this.tenantUuid = tenantUuid;
+        this.branchId = branchId;
         this.userType = userType;
         this.roles = roles;
         setAuthenticated(true);

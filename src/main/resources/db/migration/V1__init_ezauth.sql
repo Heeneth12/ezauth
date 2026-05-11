@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS user_module_privileges CASCADE;
 DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS user_applications CASCADE;
 DROP TABLE IF EXISTS tenant_applications CASCADE;
+DROP TABLE IF EXISTS tenant_branches CASCADE;
 DROP TABLE IF EXISTS user_address CASCADE;
 DROP TABLE IF EXISTS tenant_address CASCADE;
 DROP TABLE IF EXISTS privileges CASCADE;
@@ -99,6 +100,31 @@ CREATE TABLE privileges (
 -- ==========================================================
 -- 4. USERS & ROLES
 -- ==========================================================
+CREATE TABLE tenant_branches (
+    id BIGSERIAL PRIMARY KEY,
+    branch_uuid VARCHAR(36) NOT NULL UNIQUE,
+    branch_name VARCHAR(255) NOT NULL,
+    branch_code VARCHAR(100) NOT NULL,
+    description TEXT,
+    contact_email VARCHAR(255),
+    contact_phone VARCHAR(50),
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    route VARCHAR(100),
+    area VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    country VARCHAR(100),
+    pin_code VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    tenant_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_tenant_branch_code UNIQUE (tenant_id, branch_code),
+    CONSTRAINT uk_tenant_branch_name UNIQUE (tenant_id, branch_name),
+    CONSTRAINT fk_branch_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     user_uuid VARCHAR(36) NOT NULL UNIQUE,
@@ -107,12 +133,14 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     user_type VARCHAR(50) NOT NULL,
-    is_login_enabled NOT NULL DEFAULT true,
+    is_login_enabled BOOLEAN NOT NULL DEFAULT true,
     is_active BOOLEAN NOT NULL DEFAULT true,
     tenant_id BIGINT NOT NULL,
+    branch_id BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_user_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+    CONSTRAINT fk_user_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_branch FOREIGN KEY (branch_id) REFERENCES tenant_branches(id) ON DELETE SET NULL
 );
 
 CREATE TABLE roles (
