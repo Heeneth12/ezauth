@@ -1,6 +1,9 @@
 package com.ezh.ezauth.user.service;
 
+import com.ezh.ezauth.common.dto.AddressDto;
+import com.ezh.ezauth.common.entity.Address;
 import com.ezh.ezauth.common.entity.Application;
+import com.ezh.ezauth.common.entity.EntityType;
 import com.ezh.ezauth.common.entity.Module;
 import com.ezh.ezauth.common.entity.Privilege;
 import com.ezh.ezauth.common.entity.Role;
@@ -12,6 +15,7 @@ import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.dto.*;
 import com.ezh.ezauth.user.entity.*;
+
 import com.ezh.ezauth.user.repository.UserRepository;
 import com.ezh.ezauth.user.repository.projection.UserMiniProjection;
 import com.ezh.ezauth.utils.UserContextUtil;
@@ -177,7 +181,7 @@ public class UserService {
             Map<Long, UserMiniDto> resultMap = new HashMap<>();
             List<User> users = userRepository.findUsersWithAddressesByIds(userIds);
             for (User user : users) {
-                List<UserAddressDto> addresses = user.getAddresses() == null ? Collections.emptyList() :
+                List<AddressDto> addresses = user.getAddresses() == null ? Collections.emptyList() :
                         user.getAddresses().stream()
                                 .map(this::mapToAddressDto)
                                 .collect(Collectors.toList());
@@ -284,7 +288,7 @@ public class UserService {
             // B. Addresses
             if (user.getAddresses() != null) {
                 dtoBuilder.addresses(user.getAddresses().stream()
-                        .map(this::mapToAddressDto) // Assuming mapToAddressDto exists in your service
+                        .map(this::mapToAddressDto)
                         .collect(Collectors.toSet()));
             }
 
@@ -378,7 +382,7 @@ public class UserService {
 
     @Transactional
     @CacheEvict(value = "userInitCache", key = "#userId")
-    public CommonResponse addUserAddress(Long userId, UserAddressDto request) throws CommonException {
+    public CommonResponse addUserAddress(Long userId, AddressDto request) throws CommonException {
         Long tenantId = UserContextUtil.getTenantId();
         User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
@@ -386,8 +390,8 @@ public class UserService {
         if (user.getAddresses() == null) {
             user.setAddresses(new HashSet<>());
         }
-        
-        UserAddress newAddress = mapToAddressEntity(request, user, user.getTenant());
+
+        Address newAddress = mapToAddressEntity(request, userId);
         user.getAddresses().add(newAddress);
         userRepository.save(user);
 
@@ -400,7 +404,7 @@ public class UserService {
 
     @Transactional
     @CacheEvict(value = "userInitCache", key = "#userId")
-    public CommonResponse updateUserAddress(Long userId, Long addressId, UserAddressDto request) throws CommonException {
+    public CommonResponse updateUserAddress(Long userId, Long addressId, AddressDto request) throws CommonException {
         Long tenantId = UserContextUtil.getTenantId();
         User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
@@ -409,7 +413,7 @@ public class UserService {
             throw new CommonException("Address not found", HttpStatus.NOT_FOUND);
         }
 
-        UserAddress addressToUpdate = user.getAddresses().stream()
+        Address addressToUpdate = user.getAddresses().stream()
                 .filter(a -> a.getId() != null && a.getId().equals(addressId))
                 .findFirst()
                 .orElseThrow(() -> new CommonException("Address not found", HttpStatus.NOT_FOUND));
@@ -425,7 +429,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public Set<UserAddressDto> getUserAddresses(Long userId) throws CommonException {
+    public Set<AddressDto> getUserAddresses(Long userId) throws CommonException {
         Long tenantId = UserContextUtil.getTenantId();
         User user = userRepository.findByIdAndTenant_Id(userId, tenantId)
                 .orElseThrow(() -> new CommonException("User not found", HttpStatus.NOT_FOUND));
@@ -450,7 +454,7 @@ public class UserService {
             throw new CommonException("No addresses found for this user", HttpStatus.NOT_FOUND);
         }
 
-        UserAddress addressToDelete = user.getAddresses().stream()
+        Address addressToDelete = user.getAddresses().stream()
                 .filter(a -> a.getId() != null && a.getId().equals(addressId))
                 .findFirst()
                 .orElseThrow(() -> new CommonException("Address not found", HttpStatus.NOT_FOUND));
@@ -569,28 +573,23 @@ public class UserService {
     /**
      * Smart Update for Addresses (Orphan Removal, Update, Insert).
      */
-    private void syncUserAddresses(User user, Set<UserAddressDto> incomingAddresses) {
+    private void syncUserAddresses(User user, Set<AddressDto> incomingAddresses) {
         if (incomingAddresses == null) return;
         if (user.getAddresses() == null) user.setAddresses(new HashSet<>());
 
-        // 1. Identify IDs to keep
         Set<Long> incomingIds = incomingAddresses.stream()
-                .map(UserAddressDto::getId)
+                .map(AddressDto::getId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        // 2. Remove addresses not in the request (Orphan Removal)
         user.getAddresses().removeIf(existingAddr ->
                 existingAddr.getId() != null && !incomingIds.contains(existingAddr.getId())
         );
 
-        // 3. Upsert (Update or Insert)
-        for (UserAddressDto dto : incomingAddresses) {
+        for (AddressDto dto : incomingAddresses) {
             if (dto.getId() == null) {
-                // Insert New
-                user.getAddresses().add(mapToAddressEntity(dto, user, user.getTenant()));
+                user.getAddresses().add(mapToAddressEntity(dto, user.getId()));
             } else {
-                // Update Existing
                 user.getAddresses().stream()
                         .filter(a -> a.getId().equals(dto.getId()))
                         .findFirst()
@@ -600,10 +599,10 @@ public class UserService {
     }
 
 
-    private UserAddress mapToAddressEntity(UserAddressDto dto, User user, Tenant tenant) {
-        return UserAddress.builder()
-                .user(user)
-                .tenant(tenant)
+    private Address mapToAddressEntity(AddressDto dto, Long userId) {
+        return Address.builder()
+                .entityType(EntityType.USER)
+                .entityId(userId)
                 .addressLine1(dto.getAddressLine1())
                 .addressLine2(dto.getAddressLine2())
                 .route(dto.getRoute())
@@ -616,7 +615,7 @@ public class UserService {
                 .build();
     }
 
-    private void updateAddressEntity(UserAddress entity, UserAddressDto dto) {
+    private void updateAddressEntity(Address entity, AddressDto dto) {
         entity.setAddressLine1(dto.getAddressLine1());
         entity.setAddressLine2(dto.getAddressLine2());
         entity.setRoute(dto.getRoute());
@@ -628,10 +627,9 @@ public class UserService {
         entity.setAddressType(dto.getType());
     }
 
-    private UserAddressDto mapToAddressDto(UserAddress entity) {
-        return UserAddressDto.builder()
+    private AddressDto mapToAddressDto(Address entity) {
+        return AddressDto.builder()
                 .id(entity.getId())
-                .userId(entity.getUser().getId())
                 .addressLine1(entity.getAddressLine1())
                 .addressLine2(entity.getAddressLine2())
                 .route(entity.getRoute())
@@ -641,13 +639,14 @@ public class UserService {
                 .country(entity.getCountry())
                 .pinCode(entity.getPinCode())
                 .type(entity.getAddressType())
+                .isPrimary(entity.getIsPrimary())
                 .build();
     }
 
     private UserDto constructUserDto(User user, boolean sendAddressDetails) {
         if (user == null) return null;
 
-        Set<UserAddressDto> userAddresses = null;
+        Set<AddressDto> userAddresses = null;
 
         if (sendAddressDetails) {
             userAddresses = user.getAddresses()

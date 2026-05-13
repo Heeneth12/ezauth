@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.dto;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.user.entity.UserType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,5 +36,5 @@ public class CreateUserRequest {
     private Set<Long> roleIds;
     private Set<Long> applicationIds;
     private List<PrivilegeAssignRequest> privilegeMapping;
-    private Set<UserAddressDto> address;
+    private Set<AddressDto> address;
 }

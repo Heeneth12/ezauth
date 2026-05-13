@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.dto;
 
+import com.ezh.ezauth.subscription.dto.MiniSubscriptionDto;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import lombok.*;
 
@@ -24,4 +25,5 @@ public class UserInitResponse {
     private String tenantName;
     private Set<UserApplicationDto> userApplications;
     private Set<String> userRoles;
+    private MiniSubscriptionDto subscription;
 }

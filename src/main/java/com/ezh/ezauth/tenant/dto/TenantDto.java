@@ -1,8 +1,9 @@
 package com.ezh.ezauth.tenant.dto;
 
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.common.dto.ApplicationDto;
-import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.user.dto.UserMiniDto;
 import lombok.*;
 
 import java.util.Set;
@@ -20,8 +21,8 @@ public class TenantDto {
     private String email;
     private String phone;
     private Boolean isActive;
-    private UserDto tenantAdmin;
+    private UserMiniDto tenantAdmin;
     private Set<ApplicationDto> applications;
-    private Set<TenantAddressDto> tenantAddress;
+    private Set<AddressDto> tenantAddress;
     private TenantDetailsDto tenantDetails;
 }

@@ -1,5 +1,6 @@
 package com.ezh.ezauth.user.entity;
 
+import com.ezh.ezauth.branch.entity.Branch;
 import com.ezh.ezauth.common.entity.Role;
 import jakarta.persistence.*;
 import lombok.*;

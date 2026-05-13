@@ -2,8 +2,11 @@ package com.ezh.ezauth.tenant.service;
 
 
 import com.ezh.ezauth.auth.dto.AuthResponse;
+import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.common.dto.ApplicationDto;
+import com.ezh.ezauth.common.entity.Address;
 import com.ezh.ezauth.common.entity.Application;
+import com.ezh.ezauth.common.entity.EntityType;
 import com.ezh.ezauth.common.entity.Module;
 import com.ezh.ezauth.common.entity.Privilege;
 import com.ezh.ezauth.common.entity.Role;
@@ -18,11 +21,10 @@ import com.ezh.ezauth.subscription.repository.SubscriptionPlanRepository;
 import com.ezh.ezauth.subscription.repository.SubscriptionRepository;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.entity.Tenant;
-import com.ezh.ezauth.tenant.entity.TenantAddress;
 import com.ezh.ezauth.tenant.entity.TenantDetails;
 import com.ezh.ezauth.tenant.repository.TenantDetailsRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
-import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.user.dto.UserMiniDto;
 import com.ezh.ezauth.user.entity.*;
 import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
@@ -126,14 +128,14 @@ public class TenantService {
                 .autoRenew(false)
                 .build();
 
-        subscription = subscriptionRepository.save(subscription);
-        tenant.setCurrentSubscription(subscription);
+        subscriptionRepository.save(subscription);
         tenantRepository.save(tenant);
 
         //ADD ADDRESS (NEW LOGIC)
         if (request.getAddress() != null) {
-            TenantAddress tenantAddress = TenantAddress.builder()
-                    .tenant(tenant)
+            Address tenantAddress = Address.builder()
+                    .entityType(EntityType.TENANT)
+                    .entityId(tenant.getId())
                     .addressLine1(request.getAddress().getAddressLine1())
                     .addressLine2(request.getAddress().getAddressLine2())
                     .route(request.getAddress().getRoute())
@@ -145,13 +147,11 @@ public class TenantService {
                     .addressType(request.getAddress().getType())
                     .build();
 
-            // Initialize set if null and add address
             if (tenant.getAddresses() == null) {
                 tenant.setAddresses(new HashSet<>());
             }
             tenant.getAddresses().add(tenantAddress);
 
-            // Save tenant again to cascade the new address
             tenant = tenantRepository.save(tenant);
         }
 
@@ -371,7 +371,7 @@ public class TenantService {
             throw new CommonException("No addresses found for this tenant", HttpStatus.NOT_FOUND);
         }
 
-        TenantAddress addressToDelete = tenant.getAddresses().stream()
+        Address addressToDelete = tenant.getAddresses().stream()
                 .filter(a -> a.getId() != null && a.getId().equals(addressId))
                 .findFirst()
                 .orElseThrow(() -> new CommonException("Address not found for this tenant", HttpStatus.NOT_FOUND));
@@ -499,8 +499,7 @@ public class TenantService {
                 .autoRenew(false)
                 .build();
 
-        subscription = subscriptionRepository.save(subscription);
-        tenant.setCurrentSubscription(subscription);
+        subscriptionRepository.save(subscription);
 
         // 5. Create User (No Password)
         User adminUser = User.builder()
@@ -621,7 +620,7 @@ public class TenantService {
     }
 
     @Transactional
-    public CommonResponse createTenantAddress(Long tenantId, TenantAddressDto dto) throws CommonException {
+    public CommonResponse createTenantAddress(Long tenantId, AddressDto dto) throws CommonException {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
@@ -636,8 +635,9 @@ public class TenantService {
             throw new CommonException("Address already exists for type: " + dto.getType(), HttpStatus.CONFLICT);
         }
 
-        TenantAddress address = TenantAddress.builder()
-                .tenant(tenant)
+        Address address = Address.builder()
+                .entityType(EntityType.TENANT)
+                .entityId(tenantId)
                 .addressLine1(dto.getAddressLine1())
                 .addressLine2(dto.getAddressLine2())
                 .route(dto.getRoute())
@@ -660,7 +660,7 @@ public class TenantService {
     }
 
     @Transactional
-    public CommonResponse updateTenantAddress(Long tenantId, Long addressId, TenantAddressDto dto) throws CommonException {
+    public CommonResponse updateTenantAddress(Long tenantId, Long addressId, AddressDto dto) throws CommonException {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new CommonException("Tenant not found", HttpStatus.NOT_FOUND));
 
@@ -668,7 +668,7 @@ public class TenantService {
             throw new CommonException("No addresses found for this tenant", HttpStatus.NOT_FOUND);
         }
 
-        TenantAddress address = tenant.getAddresses().stream()
+        Address address = tenant.getAddresses().stream()
                 .filter(item -> item.getId().equals(addressId))
                 .findFirst()
                 .orElseThrow(() -> new CommonException("Address not found for this tenant", HttpStatus.NOT_FOUND));
@@ -714,11 +714,10 @@ public class TenantService {
             return null;
         }
 
-        // Map TenantAddress Entity -> TenantAddressDto
-        Set<TenantAddressDto> addressDtos = null;
+        Set<AddressDto> addressDtos = null;
         if (tenant.getAddresses() != null && !tenant.getAddresses().isEmpty()) {
             addressDtos = tenant.getAddresses().stream()
-                    .map(addr -> TenantAddressDto.builder()
+                    .map(addr -> AddressDto.builder()
                             .id(addr.getId())
                             .addressLine1(addr.getAddressLine1())
                             .addressLine2(addr.getAddressLine2())
@@ -729,20 +728,21 @@ public class TenantService {
                             .country(addr.getCountry())
                             .pinCode(addr.getPinCode())
                             .type(addr.getAddressType())
+                            .isPrimary(addr.getIsPrimary())
                             .build())
                     .collect(Collectors.toSet());
         }
 
-        // Map Tenant Admin (User Entity -> UserDto)
-        UserDto adminDto = null;
+        // Map Tenant Admin (User Entity -> UserMiniDto)
+        UserMiniDto adminDto = null;
         if (tenant.getTenantAdmin() != null) {
-            adminDto = UserDto.builder()
+            adminDto = UserMiniDto.builder()
                     .id(tenant.getTenantAdmin().getId())
-                    .userUuid(tenant.getTenantAdmin().getUserUuid())
-                    .fullName(tenant.getTenantAdmin().getFullName())
+                    .UserUuid(tenant.getTenantAdmin().getUserUuid())
+                    .userType(tenant.getTenantAdmin().getUserType() != null ? tenant.getTenantAdmin().getUserType().toString() : null)
+                    .name(tenant.getTenantAdmin().getFullName())
                     .email(tenant.getTenantAdmin().getEmail())
                     .phone(tenant.getTenantAdmin().getPhone())
-                    .isActive(tenant.getTenantAdmin().getIsActive())
                     .build();
         }
 
@@ -780,34 +780,29 @@ public class TenantService {
     /**
      * Helper to handle Address Upsert (Update if exists, Insert if new)
      */
-    private void handleAddressUpdate(Tenant tenant, TenantAddressDto addressDto) {
+    private void handleAddressUpdate(Tenant tenant, AddressDto addressDto) {
         if (tenant.getAddresses() == null) {
             tenant.setAddresses(new HashSet<>());
         }
 
-        // Logic: Try to find an address to update
-        // Priority 1: Find by ID (if provided)
-        // Priority 2: Find by Address Type (if no ID provided, e.g., update the "OFFICE" address)
-        TenantAddress existingAddress = tenant.getAddresses().stream()
+        Address existingAddress = tenant.getAddresses().stream()
                 .filter(a -> (addressDto.getId() != null && a.getId().equals(addressDto.getId())) ||
                         (a.getAddressType() == addressDto.getType()))
                 .findFirst()
                 .orElse(null);
 
         if (existingAddress != null) {
-            // UPDATE existing address
             existingAddress.setAddressLine1(addressDto.getAddressLine1());
             existingAddress.setAddressLine2(addressDto.getAddressLine2());
             existingAddress.setCity(addressDto.getCity());
             existingAddress.setState(addressDto.getState());
             existingAddress.setCountry(addressDto.getCountry());
             existingAddress.setPinCode(addressDto.getPinCode());
-            // We don't change the Type if we found it by Type, but safe to set it
             existingAddress.setAddressType(addressDto.getType());
         } else {
-            // CREATE new address
-            TenantAddress newAddress = TenantAddress.builder()
-                    .tenant(tenant)
+            Address newAddress = Address.builder()
+                    .entityType(EntityType.TENANT)
+                    .entityId(tenant.getId())
                     .addressLine1(addressDto.getAddressLine1())
                     .addressLine2(addressDto.getAddressLine2())
                     .city(addressDto.getCity())
