@@ -1,9 +1,10 @@
 package com.ezh.ezauth.tenant.controller;
 
+import com.ezh.ezauth.branch.dto.BranchDto;
+import com.ezh.ezauth.branch.service.BranchService;
 import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.tenant.dto.*;
 import com.ezh.ezauth.tenant.service.TenantService;
-import com.ezh.ezauth.user.dto.UserDto;
 import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class TenantController {
 
     private final TenantService tenantService;
+    private final BranchService branchService;
 
     @PostMapping(value = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<Page<TenantDto>> getAllTenants(@RequestParam Integer page, @RequestParam Integer size) throws CommonException {
@@ -121,6 +123,20 @@ public class TenantController {
         log.info("Deleting address {} for tenant ID: {}", addressId, tenantId);
         CommonResponse response = tenantService.deleteTenantAddress(tenantId, addressId);
         return ResponseResource.success(HttpStatus.OK, response, "Tenant address deleted successfully");
+    }
+
+    // ─── Branch APIs ─────────────────────────────────────────────────────────
+
+    @GetMapping(value = "/{tenantId}/branches", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<BranchDto.Response>> getTenantBranches(@PathVariable Long tenantId) throws CommonException {
+        log.info("Fetching all branches for tenant ID: {}", tenantId);
+        return ResponseResource.success(HttpStatus.OK, branchService.getBranchesByTenantId(tenantId), "Tenant branches fetched successfully");
+    }
+
+    @GetMapping(value = "/{tenantId}/branches/summary", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<BranchDto.Summary>> getTenantBranchSummaries(@PathVariable Long tenantId) throws CommonException {
+        log.info("Fetching active branch summaries for tenant ID: {}", tenantId);
+        return ResponseResource.success(HttpStatus.OK, branchService.getActiveBranchSummariesByTenantId(tenantId), "Tenant branch summaries fetched successfully");
     }
 
 }

@@ -51,13 +51,6 @@ public class Branch {
     @OneToMany(mappedBy = "branch", fetch = FetchType.LAZY)
     private Set<User> users;
 
-    // Branch-scoped role assignments
-    // user_roles rows where branch_id = this branch's id
-    @OneToMany(mappedBy = "branch",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY)
-    private Set<UserRole> userRoles;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "entity_id",

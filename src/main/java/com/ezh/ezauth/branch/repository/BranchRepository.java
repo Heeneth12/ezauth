@@ -17,4 +17,6 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
     Optional<Branch> findByIdAndTenantId(Long id, Long tenantId);
 
     boolean existsByBranchCodeAndTenantId(String branchCode, Long tenantId);
+
+    Optional<Branch> findByTenantIdAndIsHeadOfficeTrue(Long tenantId);
 }

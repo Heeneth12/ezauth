@@ -24,7 +24,7 @@ import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.entity.TenantDetails;
 import com.ezh.ezauth.tenant.repository.TenantDetailsRepository;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
-import com.ezh.ezauth.user.dto.UserDto;
+import com.ezh.ezauth.user.dto.UserMiniDto;
 import com.ezh.ezauth.user.entity.*;
 import com.ezh.ezauth.user.repository.UserApplicationRepository;
 import com.ezh.ezauth.user.repository.UserModulePrivilegeRepository;
@@ -733,16 +733,16 @@ public class TenantService {
                     .collect(Collectors.toSet());
         }
 
-        // Map Tenant Admin (User Entity -> UserDto)
-        UserDto adminDto = null;
+        // Map Tenant Admin (User Entity -> UserMiniDto)
+        UserMiniDto adminDto = null;
         if (tenant.getTenantAdmin() != null) {
-            adminDto = UserDto.builder()
+            adminDto = UserMiniDto.builder()
                     .id(tenant.getTenantAdmin().getId())
-                    .userUuid(tenant.getTenantAdmin().getUserUuid())
-                    .fullName(tenant.getTenantAdmin().getFullName())
+                    .UserUuid(tenant.getTenantAdmin().getUserUuid())
+                    .userType(tenant.getTenantAdmin().getUserType() != null ? tenant.getTenantAdmin().getUserType().toString() : null)
+                    .name(tenant.getTenantAdmin().getFullName())
                     .email(tenant.getTenantAdmin().getEmail())
                     .phone(tenant.getTenantAdmin().getPhone())
-                    .isActive(tenant.getTenantAdmin().getIsActive())
                     .build();
         }
 

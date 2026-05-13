@@ -5,5 +5,6 @@ public enum UserType {
     VENDOR,
     CUSTOMER,
     ADMIN,
-    SUPER_ADMIN
+    SUPER_ADMIN,
+    KUBEE_OPS
 }

@@ -1,9 +1,11 @@
 package com.ezh.ezauth.branch.dto;
 
+import com.ezh.ezauth.common.dto.AddressDto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.List;
 
 public class BranchDto {
 
@@ -55,6 +57,7 @@ public class BranchDto {
         private Long tenantId;
         private String tenantName;
         private int userCount;
+        private List<AddressDto> addresses;
     }
 
     @Getter
@@ -67,5 +70,19 @@ public class BranchDto {
         private String branchName;
         private String branchCode;
         private Boolean isHeadOffice;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class UserItem {
+        private Long id;
+        private String userUuid;
+        private String name;
+        private String email;
+        private String phone;
+        private String userType;
     }
 }

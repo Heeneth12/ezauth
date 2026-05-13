@@ -31,11 +31,6 @@ public class UserRole {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    // Branch-scoped role — null means tenant-wide role
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id")
-    private Branch branch;
-
     @Column(nullable = false)
     private Boolean isActive = true;
 

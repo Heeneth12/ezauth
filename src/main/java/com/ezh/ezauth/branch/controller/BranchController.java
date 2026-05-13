@@ -62,6 +62,34 @@ public class BranchController {
         return ResponseResource.success(HttpStatus.OK, branchService.getActiveBranchSummaries(), "Branch summaries fetched successfully");
     }
 
+    @GetMapping(value = "/my", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<BranchDto.Response> getMyBranch() throws CommonException {
+        log.info("Fetching branch for current user");
+        return ResponseResource.success(HttpStatus.OK, branchService.getMyBranch(), "Branch fetched successfully");
+    }
+
+    @GetMapping(value = "/{branchId}/users", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<List<BranchDto.UserItem>> getBranchUsers(@PathVariable Long branchId) throws CommonException {
+        log.info("Fetching users for branch ID: {}", branchId);
+        return ResponseResource.success(HttpStatus.OK, branchService.getBranchUsers(branchId), "Branch users fetched successfully");
+    }
+
+    @PatchMapping(value = "/{branchId}/users/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> assignUserToBranch(
+            @PathVariable Long branchId,
+            @PathVariable Long userId) throws CommonException {
+        log.info("Assigning user {} to branch ID: {}", userId, branchId);
+        return ResponseResource.success(HttpStatus.OK, branchService.assignUserToBranch(branchId, userId), "User assigned to branch successfully");
+    }
+
+    @DeleteMapping(value = "/{branchId}/users/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> removeUserFromBranch(
+            @PathVariable Long branchId,
+            @PathVariable Long userId) throws CommonException {
+        log.info("Removing user {} from branch ID: {}", userId, branchId);
+        return ResponseResource.success(HttpStatus.OK, branchService.removeUserFromBranch(branchId, userId), "User removed from branch successfully");
+    }
+
     @PostMapping(value = "/{branchId}/address", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> addBranchAddress(
             @PathVariable Long branchId,
