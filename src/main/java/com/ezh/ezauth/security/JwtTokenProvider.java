@@ -32,7 +32,7 @@ public class JwtTokenProvider {
     /**
      * Generate Access Token - Now includes UUIDs
      */
-    public String generateAccessToken(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles) {
+    public String generateAccessToken(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles, String accountScope) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
@@ -45,7 +45,8 @@ public class JwtTokenProvider {
                         "tenantUuid", tenantUuid,
                         "userType", userType,
                         "roles", roles,
-                        "type", "ACCESS"
+                        "type", "ACCESS",
+                        "accountScope", accountScope
                 ))
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
@@ -102,6 +103,10 @@ public class JwtTokenProvider {
 
     public String getRolesFromToken(String token) {
         return getClaims(token).get("roles", String.class);
+    }
+
+    public String getAccountScopeFromToken(String token) {
+        return getClaims(token).get("accountScope", String.class);
     }
 
     // Validation Methods

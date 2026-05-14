@@ -20,8 +20,9 @@ public class JwtAuthentication extends AbstractAuthenticationToken {
     private final String tenantUuid;
     private final String userType;
     private final String roles;
+    private final String accountScope;
 
-    public JwtAuthentication(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles) {
+    public JwtAuthentication(Long userId, String userUuid, String email, Long tenantId, String tenantUuid, String userType, String roles, String accountScope) {
         super(parseAuthorities(roles));
         this.userId = userId;
         this.userUuid = userUuid;
@@ -30,6 +31,7 @@ public class JwtAuthentication extends AbstractAuthenticationToken {
         this.tenantUuid = tenantUuid;
         this.userType = userType;
         this.roles = roles;
+        this.accountScope = accountScope;
         setAuthenticated(true);
     }
 

@@ -15,4 +15,5 @@ public class UserContext {
     private Long tenantId;
     private String userType;
     private String roles;
+    private String accountScope;
 }

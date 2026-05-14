@@ -53,6 +53,11 @@ public class User {
     private UserType userType;
 
     @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_scope", nullable = false, length = 20)
+    private AccountScope accountScope = AccountScope.TENANT;
+
+    @Builder.Default
     @Column(name = "is_login_enabled", nullable = false)
     private Boolean isLoginEnabled = true;
 

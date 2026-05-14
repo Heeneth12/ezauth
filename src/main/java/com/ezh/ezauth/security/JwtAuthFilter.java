@@ -46,8 +46,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String email = jwtTokenProvider.getEmailFromToken(token);
                 String userType = jwtTokenProvider.getUserTypeFromToken(token);
                 String roles = jwtTokenProvider.getRolesFromToken(token);
+                String accountScope = jwtTokenProvider.getAccountScopeFromToken(token);
 
-                // Populate UserContext (ensure UserContext class is updated with these fields)
                 userContext.setUserId(userId);
                 userContext.setUserUuid(userUuid);
                 userContext.setEmail(email);
@@ -55,8 +55,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 userContext.setTenantUuid(tenantUuid);
                 userContext.setUserType(userType);
                 userContext.setRoles(roles);
+                userContext.setAccountScope(accountScope);
 
-                // Create authentication object with the new UUID parameters
                 JwtAuthentication authentication = new JwtAuthentication(
                         userId,
                         userUuid,
@@ -64,7 +64,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         tenantId,
                         tenantUuid,
                         userType,
-                        roles
+                        roles,
+                        accountScope
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);

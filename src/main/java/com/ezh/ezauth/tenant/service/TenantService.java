@@ -281,7 +281,8 @@ public class TenantService {
                 user.getTenant().getId(),
                 user.getTenant().getTenantUuid(),
                 user.getUserType().name(),
-                roles
+                roles,
+                user.getAccountScope().name()
         );
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 

@@ -51,4 +51,19 @@ public class UserContextUtil {
         }
         return userId;
     }
+
+    public static String getAccountScope() {
+        JwtAuthentication auth = getAuth();
+        return auth != null ? auth.getAccountScope() : null;
+    }
+
+    public static boolean isPlatformUser() {
+        return "PLATFORM".equals(getAccountScope());
+    }
+
+    public static void requirePlatformAccess() throws CommonException {
+        if (!isPlatformUser()) {
+            throw new CommonException("Access denied", HttpStatus.FORBIDDEN);
+        }
+    }
 }

@@ -104,6 +104,8 @@ public class UserService {
 
         boolean isLoginEnabled = !request.getUserType().equals(UserType.CUSTOMER);
 
+        // accountScope is always TENANT here — platform users can only be created via internal tooling.
+        // This prevents a tenant admin from escalating by passing userType = KUBEE_OPS.
         User user = User.builder()
                 .userUuid(UUID.randomUUID().toString())
                 .fullName(request.getFullName())
@@ -111,6 +113,7 @@ public class UserService {
                 .phone(request.getPhone())
                 .isActive(true)
                 .userType(request.getUserType())
+                .accountScope(AccountScope.TENANT)
                 .isLoginEnabled(isLoginEnabled)
                 .tenant(tenant)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
