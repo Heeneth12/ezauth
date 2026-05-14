@@ -197,6 +197,7 @@ CREATE TABLE auth.users
     password_hash        VARCHAR(255) NOT NULL,
     phone                VARCHAR(50),
     profile_picture_uuid VARCHAR(100),
+    account_scope        VARCHAR(50)  NOT NULL,
     user_type            VARCHAR(50)  NOT NULL,
     is_login_enabled     BOOLEAN      NOT NULL        DEFAULT TRUE,
     is_active            BOOLEAN      NOT NULL        DEFAULT TRUE,

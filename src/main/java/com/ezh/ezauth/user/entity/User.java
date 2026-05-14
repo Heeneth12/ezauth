@@ -49,12 +49,12 @@ public class User {
     // TENANT_ADMIN → branch must be null (enforced by DB CHECK + service layer)
     // Others       → branch must be set
     @Enumerated(EnumType.STRING)
-    @Column(name = "user_type", nullable = false, length = 20)
+    @Column(name = "user_type", nullable = false, length = 50)
     private UserType userType;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(name = "account_scope", nullable = false, length = 20)
+    @Column(name = "account_scope", nullable = false, length = 50)
     private AccountScope accountScope = AccountScope.TENANT;
 
     @Builder.Default
