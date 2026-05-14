@@ -1,6 +1,5 @@
 package com.ezh.ezauth.user.entity;
 
-import com.ezh.ezauth.common.entity.Module;
 import com.ezh.ezauth.common.entity.Privilege;
 import jakarta.persistence.*;
 import lombok.*;
@@ -11,7 +10,7 @@ import java.util.Objects;
 @Table(
         name = "user_module_privileges",
         uniqueConstraints = @UniqueConstraint(
-                columnNames = {"user_application_id", "module_id", "privilege_id"}
+                columnNames = {"user_application_id","privilege_id"}
         )
 )
 @Getter
@@ -29,9 +28,9 @@ public class UserModulePrivilege {
     @JoinColumn(name = "user_application_id", nullable = false)
     private UserApplication userApplication;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "module_id", nullable = false)
-    private Module module;
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "module_id", nullable = false)
+    // private Module module;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "privilege_id", nullable = false)
@@ -55,14 +54,13 @@ public class UserModulePrivilege {
             return Objects.equals(this.id, that.id);
         }
 
-        // 2. Otherwise match by Business Key (UserApp + Module + Privilege)
+        // 2. Otherwise match by Business Key (UserApp & Privilege)
         return Objects.equals(userApplication, that.userApplication) &&
-                Objects.equals(module, that.module) &&
                 Objects.equals(privilege, that.privilege);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userApplication, module, privilege);
+        return Objects.hash(userApplication, privilege);
     }
 }

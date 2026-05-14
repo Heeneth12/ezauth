@@ -71,7 +71,12 @@ CREATE TABLE auth.tenant_details
     base_currency CHAR(3)      NOT NULL,
     time_zone     VARCHAR(100) NOT NULL DEFAULT 'UTC',
     gst_number    VARCHAR(50) UNIQUE,
+    cin_number    VARCHAR(50) UNIQUE,
+    is_gst_verified BOOLEAN      NOT NULL DEFAULT FALSE,
     pan_number    VARCHAR(20),
+    trade_name    VARCHAR(255),
+    kyc_status    VARCHAR(50),
+    incorporation_date TIMESTAMPTZ,
     support_email VARCHAR(255),
     contact_phone VARCHAR(50),
     logo_url      TEXT,
@@ -79,7 +84,6 @@ CREATE TABLE auth.tenant_details
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
-
 
 -- =============================================================
 -- 4. SUBSCRIPTIONS
@@ -91,6 +95,7 @@ CREATE TABLE auth.subscriptions
     plan_id    BIGINT      NOT NULL REFERENCES auth.subscription_plans (id),
     status     VARCHAR(20) NOT NULL CHECK (status IN ('TRIAL', 'ACTIVE', 'EXPIRED', 'CANCELLED')),
     start_date TIMESTAMPTZ NOT NULL,
+    is_primary BOOLEAN     NOT NULL DEFAULT FALSE,
     end_date   TIMESTAMPTZ NOT NULL,
     auto_renew BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -184,7 +189,7 @@ CREATE TABLE auth.privileges
 CREATE TABLE auth.users
 (
     id                   BIGSERIAL PRIMARY KEY,
-    user_uuid            UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_uuid            VARCHAR(50)  NOT NULL UNIQUE,
     tenant_id            BIGINT       NOT NULL REFERENCES auth.tenants (id) ON DELETE CASCADE,
     branch_id            BIGINT REFERENCES auth.branches (id) ON DELETE RESTRICT,
     full_name            VARCHAR(255) NOT NULL,
@@ -192,21 +197,11 @@ CREATE TABLE auth.users
     password_hash        VARCHAR(255) NOT NULL,
     phone                VARCHAR(50),
     profile_picture_uuid VARCHAR(100),
-    user_type            VARCHAR(20)  NOT NULL
-        CHECK (user_type IN ('TENANT_ADMIN', 'BRANCH_MANAGER', 'STAFF', 'GUEST')),
+    user_type            VARCHAR(50)  NOT NULL,
     is_login_enabled     BOOLEAN      NOT NULL        DEFAULT TRUE,
     is_active            BOOLEAN      NOT NULL        DEFAULT TRUE,
     created_at           TIMESTAMPTZ  NOT NULL        DEFAULT NOW(),
     updated_at           TIMESTAMPTZ  NOT NULL        DEFAULT NOW(),
-
-    -- TENANT_ADMIN must not be scoped to a branch
-    CONSTRAINT chk_admin_no_branch
-        CHECK (user_type <> 'TENANT_ADMIN' OR branch_id IS NULL),
-
-    -- Non-admin users must have a branch (enforced in app layer for now;
-    -- flip to NOT NULL on branch_id after branch feature fully rolls out)
-    CONSTRAINT chk_non_admin_needs_branch
-        CHECK (user_type = 'TENANT_ADMIN' OR branch_id IS NOT NULL)
 );
 
 -- Circular FK: tenants → users
@@ -260,7 +255,7 @@ CREATE TABLE auth.user_roles
     role_id     BIGINT      NOT NULL REFERENCES auth.roles (id) ON DELETE CASCADE,
     is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
     assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    assigned_by BIGINT      NOT NULL,
+    assigned_by BIGINT,
     expires_at  TIMESTAMPTZ,
 
     CONSTRAINT uk_user_role UNIQUE (user_id, role_id),

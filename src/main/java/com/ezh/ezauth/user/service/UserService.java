@@ -309,12 +309,11 @@ public class UserService {
                             List<UserDto.UserModulePrivilegeDto> privs = ua.getModulePrivileges().stream()
                                     .filter(UserModulePrivilege::getIsActive)
                                     .map(ump -> UserDto.UserModulePrivilegeDto.builder()
-                                            .moduleId(ump.getModule().getId())
-                                            .privilegeId(ump.getPrivilege().getId())
-                                            // MAPPING NEW FIELDS
-                                            .privilegeName(ump.getPrivilege().getPrivilegeName())
-                                            .privilegeKey(ump.getPrivilege().getPrivilegeKey())
-                                            .build())
+                                        .moduleId(ump.getPrivilege().getModule().getId())  // ✅ via privilege
+                                        .privilegeId(ump.getPrivilege().getId())
+                                        .privilegeName(ump.getPrivilege().getPrivilegeName())
+                                        .privilegeKey(ump.getPrivilege().getPrivilegeKey())
+                                        .build())
                                     .collect(Collectors.toList());
 
                             return UserDto.UserAppEditDto.builder()
@@ -537,31 +536,28 @@ public class UserService {
 
             if (ua.getModulePrivileges() == null) ua.setModulePrivileges(new HashSet<>());
 
-            // Target privileges for this specific module
             Set<Long> targetPrivilegeIds = new HashSet<>(pm.getPrivilegeIds());
 
-            // 1. Remove privileges for this module that are NOT in the request
+            // ✅ derive module via privilege.getModule()
             ua.getModulePrivileges().removeIf(ump ->
-                    ump.getModule().getId().equals(pm.getModuleId()) &&
+                    ump.getPrivilege().getModule().getId().equals(pm.getModuleId()) &&
                             !targetPrivilegeIds.contains(ump.getPrivilege().getId())
             );
 
-            // 2. Add new privileges
+            // ✅ derive module via privilege.getModule()
             Set<Long> existingPrivilegeIds = ua.getModulePrivileges().stream()
-                    .filter(ump -> ump.getModule().getId().equals(pm.getModuleId()))
+                    .filter(ump -> ump.getPrivilege().getModule().getId().equals(pm.getModuleId()))
                     .map(ump -> ump.getPrivilege().getId())
                     .collect(Collectors.toSet());
 
-            Module module = moduleRepository.findById(pm.getModuleId())
-                    .orElseThrow(() -> new CommonException("Module not found: " + pm.getModuleId(), HttpStatus.BAD_REQUEST));
-
+            // ✅ module fetch no longer needed — remove moduleRepository call entirely
             List<Privilege> privilegesToAdd = privilegeRepository.findAllById(pm.getPrivilegeIds());
 
             for (Privilege priv : privilegesToAdd) {
                 if (!existingPrivilegeIds.contains(priv.getId())) {
                     ua.getModulePrivileges().add(UserModulePrivilege.builder()
                             .userApplication(ua)
-                            .module(module)
+                            // ✅ no .module() here
                             .privilege(priv)
                             .isActive(true)
                             .build());
@@ -674,14 +670,13 @@ public class UserService {
         return ua.getModulePrivileges().stream()
                 .filter(UserModulePrivilege::getIsActive)
                 .collect(Collectors.groupingBy(
-                        ump -> ump.getModule().getModuleKey(),
+                        ump -> ump.getPrivilege().getModule().getModuleKey(), // ✅ via privilege
                         Collectors.mapping(
                                 ump -> ump.getPrivilege().getPrivilegeKey(),
                                 Collectors.toSet()
                         )
                 ));
     }
-
     /**
      * Apply user type-specific defaults to the request.
      * If enforceDefaults is true, always applies defaults regardless of request data.

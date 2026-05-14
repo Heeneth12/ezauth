@@ -189,7 +189,6 @@ public class TenantService {
             for (Privilege privilege : module.getPrivileges()) {
                 UserModulePrivilege ump = UserModulePrivilege.builder()
                         .userApplication(userApplication)
-                        .module(module)
                         .privilege(privilege)
                         .isActive(true)
                         .build();
@@ -530,7 +529,6 @@ public class TenantService {
             for (Privilege privilege : module.getPrivileges()) {
                 UserModulePrivilege ump = UserModulePrivilege.builder()
                         .userApplication(userApplication)
-                        .module(module)
                         .privilege(privilege)
                         .isActive(true)
                         .build();

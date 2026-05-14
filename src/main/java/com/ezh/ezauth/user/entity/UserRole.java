@@ -34,6 +34,9 @@ public class UserRole {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "assigned_by")
+    private Long assignedBy;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime assignedAt;
