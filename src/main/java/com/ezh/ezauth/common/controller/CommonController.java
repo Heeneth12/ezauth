@@ -42,11 +42,46 @@ public class CommonController {
         return ResponseResource.success(HttpStatus.CREATED, response, "User roles fetched  successfully");
     }
 
+    @PostMapping(value = "/app/create", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> createApplication(@Valid @RequestBody ApplicationDto dto) throws CommonException {
+        log.info("Entered create application");
+        CommonResponse response = commonService.createApplication(dto);
+        return ResponseResource.success(HttpStatus.CREATED, response, "Application created successfully");
+    }
+
+    @PutMapping(value = "/app/{appId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateApplication(@PathVariable Long appId, @Valid @RequestBody ApplicationDto dto) throws CommonException {
+        log.info("Entered update application id={}", appId);
+        CommonResponse response = commonService.updateApplication(appId, dto);
+        return ResponseResource.success(HttpStatus.OK, response, "Application updated successfully");
+    }
+
+    @DeleteMapping(value = "/app/{appId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteApplication(@PathVariable Long appId) throws CommonException {
+        log.info("Entered delete application id={}", appId);
+        CommonResponse response = commonService.deleteApplication(appId);
+        return ResponseResource.success(HttpStatus.OK, response, "Application removed successfully");
+    }
+
     @PostMapping(value = "/role/create", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> createRole(@RequestBody RoleDto roleDto) throws CommonException {
         log.info("Entered create role");
         CommonResponse response = commonService.createRole(roleDto);
         return ResponseResource.success(HttpStatus.CREATED, response, "Role created successfully");
+    }
+
+    @PutMapping(value = "/role/{roleId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> updateRole(@PathVariable Long roleId, @RequestBody RoleDto dto) throws CommonException {
+        log.info("Entered update role id={}", roleId);
+        CommonResponse response = commonService.updateRole(roleId, dto);
+        return ResponseResource.success(HttpStatus.OK, response, "Role updated successfully");
+    }
+
+    @DeleteMapping(value = "/role/{roleId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deleteRole(@PathVariable Long roleId) throws CommonException {
+        log.info("Entered delete role id={}", roleId);
+        CommonResponse response = commonService.deleteRole(roleId);
+        return ResponseResource.success(HttpStatus.OK, response, "Role deleted successfully");
     }
 
     @GetMapping(value = "/user-types", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -13,4 +13,6 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
     List<Role> findByTenantId(Long tenantId);
 
     Optional<Role> findByRoleKeyAndTenantId(String roleKey, Long tenantId);
+
+    Optional<Role> findByIdAndTenant_Id(Long id, Long tenantId);
 }

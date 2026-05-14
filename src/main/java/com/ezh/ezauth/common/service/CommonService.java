@@ -11,10 +11,10 @@ import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
-import com.ezh.ezauth.security.JwtTokenProvider;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.user.entity.UserType;
+import com.ezh.ezauth.user.repository.UserRoleRepository;
 import com.ezh.ezauth.utils.UserContextUtil;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
@@ -37,9 +37,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CommonService {
 
+    private final ApplicationRepository applicationRepository;
     private final ModuleRepository moduleRepository;
     private final RoleRepository roleRepository;
     private final TenantRepository tenantRepository;
+    private final UserRoleRepository userRoleRepository;
 
 
     @Transactional(readOnly = true)
@@ -124,6 +126,104 @@ public class CommonService {
         return modules.stream()
                 .map(this::constructModuleDto)
                 .toList();
+    }
+
+    @Transactional
+    public CommonResponse createApplication(ApplicationDto dto) throws CommonException {
+        log.info("Creating application: {}", dto.getAppKey());
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+
+        if (applicationRepository.findByAppKey(dto.getAppKey()).isPresent()) {
+            throw new CommonException("Application with key '" + dto.getAppKey() + "' already exists", HttpStatus.CONFLICT);
+        }
+
+        Application app = Application.builder()
+                .appName(dto.getAppName())
+                .appKey(dto.getAppKey())
+                .description(dto.getDescription())
+                .isActive(true)
+                .build();
+        app = applicationRepository.save(app);
+        tenantRepository.linkApplicationToTenant(tenantId, app.getId());
+
+        return CommonResponse.builder().status(Status.SUCCESS).message("Application created successfully").build();
+    }
+
+    @Transactional
+    public CommonResponse updateApplication(Long appId, ApplicationDto dto) throws CommonException {
+        log.info("Updating application id={}", appId);
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+
+        if (!tenantRepository.existsTenantApplication(tenantId, appId)) {
+            throw new CommonException("Application not found", HttpStatus.NOT_FOUND);
+        }
+
+        Application app = applicationRepository.findById(appId)
+                .orElseThrow(() -> new CommonException("Application not found", HttpStatus.NOT_FOUND));
+
+        app.setAppName(dto.getAppName());
+        app.setDescription(dto.getDescription());
+        if (dto.getIsActive() != null) {
+            app.setIsActive(dto.getIsActive());
+        }
+        applicationRepository.save(app);
+
+        return CommonResponse.builder().status(Status.SUCCESS).message("Application updated successfully").build();
+    }
+
+    @Transactional
+    public CommonResponse deleteApplication(Long appId) throws CommonException {
+        log.info("Deleting application id={}", appId);
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+
+        if (!tenantRepository.existsTenantApplication(tenantId, appId)) {
+            throw new CommonException("Application not found", HttpStatus.NOT_FOUND);
+        }
+
+        tenantRepository.unlinkApplicationFromTenant(tenantId, appId);
+
+        return CommonResponse.builder().status(Status.SUCCESS).message("Application removed successfully").build();
+    }
+
+    @Transactional
+    public CommonResponse updateRole(Long roleId, RoleDto dto) throws CommonException {
+        log.info("Updating role id={}", roleId);
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+
+        Role role = roleRepository.findByIdAndTenant_Id(roleId, tenantId)
+                .orElseThrow(() -> new CommonException("Role not found", HttpStatus.NOT_FOUND));
+
+        if (Boolean.TRUE.equals(role.getIsSystemRole())) {
+            throw new CommonException("System roles cannot be modified", HttpStatus.BAD_REQUEST);
+        }
+
+        role.setRoleName(dto.getRoleName());
+        role.setRoleKey(dto.getRoleKey());
+        role.setDescription(dto.getDescription());
+        roleRepository.save(role);
+
+        return CommonResponse.builder().status(Status.SUCCESS).message("Role updated successfully").build();
+    }
+
+    @Transactional
+    public CommonResponse deleteRole(Long roleId) throws CommonException {
+        log.info("Deleting role id={}", roleId);
+        Long tenantId = UserContextUtil.getTenantIdOrThrow();
+
+        Role role = roleRepository.findByIdAndTenant_Id(roleId, tenantId)
+                .orElseThrow(() -> new CommonException("Role not found", HttpStatus.NOT_FOUND));
+
+        if (Boolean.TRUE.equals(role.getIsSystemRole())) {
+            throw new CommonException("System roles cannot be deleted", HttpStatus.BAD_REQUEST);
+        }
+
+        if (userRoleRepository.existsByRole_Id(roleId)) {
+            throw new CommonException("Role is assigned to users and cannot be deleted", HttpStatus.CONFLICT);
+        }
+
+        roleRepository.delete(role);
+
+        return CommonResponse.builder().status(Status.SUCCESS).message("Role deleted successfully").build();
     }
 
     private ApplicationDto constructDtoFromEntity(Application application) {
