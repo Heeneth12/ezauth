@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import com.ezh.ezauth.common.entity.Application;
 
 @Entity
 @Table(name = "subscription_plans")
@@ -17,6 +18,10 @@ public class SubscriptionPlan {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "application_id", nullable = false)
+    private Application application;
 
     @Column(nullable = false, unique = true)
     private String name;

@@ -12,6 +12,8 @@ import com.ezh.ezauth.tenant.repository.TenantRepository;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.Status;
 import com.ezh.ezauth.utils.exception.CommonException;
+import com.ezh.ezauth.common.entity.Application;
+import com.ezh.ezauth.common.repository.ApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,7 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository planRepository;
     private final TenantRepository tenantRepository;
+    private final ApplicationRepository applicationRepository;
 
     @Transactional
     public CommonResponse subscribeTenant(Long tenantId, Long planId) throws CommonException {
@@ -102,8 +105,14 @@ public class SubscriptionService {
 
     @Transactional
     public CommonResponse createPlan(SubscriptionPlanDto dto) throws CommonException {
+
         log.info("Creating new subscription plan: {}", dto.getName());
+
+        Application application = applicationRepository.findById(dto.getApplicationId())
+                .orElseThrow(() -> new CommonException("Application not found with id: " + dto.getApplicationId(), HttpStatus.BAD_REQUEST));
+
         SubscriptionPlan plan = SubscriptionPlan.builder()
+                .application(application)
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .type(dto.getType())
@@ -119,6 +128,70 @@ public class SubscriptionService {
                 .id(plan.getId().toString())
                 .status(Status.SUCCESS)
                 .message("Subscription plan created successfully")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse editPlan(Long planId, SubscriptionPlanDto dto) throws CommonException {
+        log.info("Editing subscription plan: {}", planId);
+
+        SubscriptionPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new CommonException("Subscription plan not found with id: " + planId, HttpStatus.BAD_REQUEST));
+
+        Application application = applicationRepository.findById(dto.getApplicationId())
+                .orElseThrow(() -> new CommonException("Application not found with id: " + dto.getApplicationId(), HttpStatus.BAD_REQUEST));
+
+        plan.setApplication(application);
+        plan.setName(dto.getName());
+        plan.setDescription(dto.getDescription());
+        plan.setType(dto.getType());
+        plan.setPrice(dto.getPrice());
+        plan.setDurationDays(dto.getDurationDays());
+        plan.setMaxUsers(dto.getMaxUsers());
+        
+        if (dto.getIsActive() != null) {
+            plan.setIsActive(dto.getIsActive());
+        }
+
+        planRepository.save(plan);
+
+        return CommonResponse.builder()
+                .id(plan.getId().toString())
+                .status(Status.SUCCESS)
+                .message("Subscription plan updated successfully")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse deletePlan(Long planId) throws CommonException {
+        log.info("Deleting subscription plan: {}", planId);
+
+        SubscriptionPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new CommonException("Subscription plan not found with id: " + planId, HttpStatus.BAD_REQUEST));
+
+        planRepository.delete(plan);
+
+        return CommonResponse.builder()
+                .id(planId.toString())
+                .status(Status.SUCCESS)
+                .message("Subscription plan deleted successfully")
+                .build();
+    }
+
+    @Transactional
+    public CommonResponse disablePlan(Long planId) throws CommonException {
+        log.info("Disabling subscription plan: {}", planId);
+
+        SubscriptionPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new CommonException("Subscription plan not found with id: " + planId, HttpStatus.BAD_REQUEST));
+
+        plan.setIsActive(false);
+        planRepository.save(plan);
+
+        return CommonResponse.builder()
+                .id(planId.toString())
+                .status(Status.SUCCESS)
+                .message("Subscription plan disabled successfully")
                 .build();
     }
 
@@ -145,6 +218,7 @@ public class SubscriptionService {
     private SubscriptionPlanDto mapToDto(SubscriptionPlan plan) {
         return SubscriptionPlanDto.builder()
                 .id(plan.getId())
+                .applicationId(plan.getApplication().getId())
                 .name(plan.getName())
                 .description(plan.getDescription())
                 .type(plan.getType())
@@ -165,6 +239,7 @@ public class SubscriptionService {
         SubscriptionPlan plan = subscription.getPlan();
         SubscriptionPlanDto planDto = SubscriptionPlanDto.builder()
                 .id(plan.getId())
+                .applicationId(plan.getApplication().getId())
                 .name(plan.getName())
                 .description(plan.getDescription())
                 .type(plan.getType())

@@ -7,6 +7,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
 
 @Entity
 @Table(name = "applications")
@@ -32,6 +33,9 @@ public class Application {
 
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL)
     private Set<Module> modules;
+
+    @OneToMany(mappedBy = "application", cascade = CascadeType.ALL)
+    private Set<SubscriptionPlan> subscriptionPlans;
 
     @CreationTimestamp
     @Column(updatable = false)

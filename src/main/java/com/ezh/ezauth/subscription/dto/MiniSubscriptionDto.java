@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class MiniSubscriptionDto {
     private Long id;
+    private Long applicationId;
     private SubscriptionStatus status;
     private LocalDateTime startDate;
     private LocalDateTime endDate;

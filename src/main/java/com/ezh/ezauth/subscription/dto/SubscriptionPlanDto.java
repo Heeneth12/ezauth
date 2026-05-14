@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 @Builder
 public class SubscriptionPlanDto {
     private Long id;
+    private Long applicationId;
     private String name;
     private String description;
     private PlanType type;

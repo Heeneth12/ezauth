@@ -47,9 +47,30 @@ public class SubscriptionController {
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<CommonResponse> createPlan(@RequestBody SubscriptionPlanDto planDto) throws CommonException {
-        log.info("Entered create subscription plan");
+        log.info("Entered create subscription plan: {}", planDto);
         CommonResponse response = subscriptionService.createPlan(planDto);
         return ResponseResource.success(HttpStatus.CREATED, response, "Subscription plan created successfully");
+    }
+
+    @PutMapping(value = "/plan/{planId}", produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> editPlan(@PathVariable Long planId, @RequestBody SubscriptionPlanDto planDto) throws CommonException {
+        log.info("Entered edit subscription plan for id: {}", planId);
+        CommonResponse response = subscriptionService.editPlan(planId, planDto);
+        return ResponseResource.success(HttpStatus.OK, response, "Subscription plan updated successfully");
+    }
+
+    @DeleteMapping(value = "/plan/{planId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> deletePlan(@PathVariable Long planId) throws CommonException {
+        log.info("Entered delete subscription plan for id: {}", planId);
+        CommonResponse response = subscriptionService.deletePlan(planId);
+        return ResponseResource.success(HttpStatus.OK, response, "Subscription plan deleted successfully");
+    }
+
+    @PatchMapping(value = "/plan/{planId}/disable", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<CommonResponse> disablePlan(@PathVariable Long planId) throws CommonException {
+        log.info("Entered disable subscription plan for id: {}", planId);
+        CommonResponse response = subscriptionService.disablePlan(planId);
+        return ResponseResource.success(HttpStatus.OK, response, "Subscription plan disabled successfully");
     }
 
     @GetMapping(value = "/active", produces = MediaType.APPLICATION_JSON_VALUE)

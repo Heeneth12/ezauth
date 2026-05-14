@@ -15,11 +15,26 @@ DROP TABLE IF EXISTS auth.roles CASCADE;
 DROP TABLE IF EXISTS auth.branches CASCADE;
 DROP TABLE IF EXISTS auth.privileges CASCADE;
 DROP TABLE IF EXISTS auth.modules CASCADE;
-DROP TABLE IF EXISTS auth.applications CASCADE;
 DROP TABLE IF EXISTS auth.subscriptions CASCADE;
 DROP TABLE IF EXISTS auth.subscription_plans CASCADE;
+DROP TABLE IF EXISTS auth.applications CASCADE;
 DROP TABLE IF EXISTS auth.tenant_details CASCADE;
 DROP TABLE IF EXISTS auth.tenants CASCADE;
+
+
+-- =============================================================
+-- 0. APPLICATIONS  (platform-level — not tenant-scoped)
+-- =============================================================
+CREATE TABLE auth.applications
+(
+    id          BIGSERIAL PRIMARY KEY,
+    app_name    VARCHAR(255) NOT NULL,
+    app_key     VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
 
 
 -- =============================================================
@@ -27,8 +42,9 @@ DROP TABLE IF EXISTS auth.tenants CASCADE;
 -- =============================================================
 CREATE TABLE auth.subscription_plans
 (
-    id            BIGSERIAL PRIMARY KEY,
-    name          VARCHAR(100)   NOT NULL UNIQUE,
+    id             BIGSERIAL PRIMARY KEY,
+    application_id BIGINT         NOT NULL REFERENCES auth.applications (id) ON DELETE CASCADE,
+    name           VARCHAR(100)   NOT NULL UNIQUE,
     description   TEXT,
     type          VARCHAR(20)    NOT NULL CHECK (type IN ('LIFETIME', 'MONTHLY', 'YEARLY')),
     price         NUMERIC(19, 2) NOT NULL DEFAULT 0.00 CHECK (price >= 0),
@@ -131,20 +147,6 @@ CREATE UNIQUE INDEX uk_one_head_office_per_tenant
     ON auth.branches (tenant_id) WHERE is_head_office = TRUE;
 
 
--- =============================================================
--- 6. APPLICATIONS  (platform-level — not tenant-scoped)
--- =============================================================
-CREATE TABLE auth.applications
-(
-    id          BIGSERIAL PRIMARY KEY,
-    app_name    VARCHAR(255) NOT NULL,
-    app_key     VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-
 
 -- =============================================================
 -- 7. MODULES  (belongs to application)
@@ -202,7 +204,7 @@ CREATE TABLE auth.users
     is_login_enabled     BOOLEAN      NOT NULL        DEFAULT TRUE,
     is_active            BOOLEAN      NOT NULL        DEFAULT TRUE,
     created_at           TIMESTAMPTZ  NOT NULL        DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ  NOT NULL        DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL        DEFAULT NOW()
 );
 
 -- Circular FK: tenants → users
@@ -396,21 +398,21 @@ CREATE INDEX idx_addresses_entity ON auth.addresses (entity_type, entity_id);
 
 
 -- =============================================================
--- 19. SEED — SUBSCRIPTION PLANS
--- =============================================================
-INSERT INTO auth.subscription_plans (name, description, type, price, duration_days, max_users)
-VALUES ('Free Trial', 'Full platform access for 14 days.', 'LIFETIME', 0.00, 14, 2),
-       ('Basic', 'Essential tools for small teams.', 'MONTHLY', 9.99, 30, 5),
-       ('Pro Monthly', 'Advanced features for growing businesses.', 'MONTHLY', 29.99, 30, 20),
-       ('Pro Yearly', 'Best value for established teams. Save 17%.', 'YEARLY', 299.00, 365, 20),
-       ('Enterprise', 'Unlimited access with priority support.', 'YEARLY', 999.00, 365, NULL);
-
-
--- =============================================================
--- 20. SEED — APPLICATION
+-- 19. SEED — APPLICATION
 -- =============================================================
 INSERT INTO auth.applications (id, app_name, app_key, description)
 VALUES (1, 'Inventory Management', 'EZH_INV_APP', 'Core system for stock, sales, and purchase tracking');
+
+
+-- =============================================================
+-- 20. SEED — SUBSCRIPTION PLANS
+-- =============================================================
+INSERT INTO auth.subscription_plans (application_id, name, description, type, price, duration_days, max_users)
+VALUES (1, 'Free Trial', 'Full platform access for 14 days.', 'LIFETIME', 0.00, 14, 2),
+       (1, 'Basic', 'Essential tools for small teams.', 'MONTHLY', 9.99, 30, 5),
+       (1, 'Pro Monthly', 'Advanced features for growing businesses.', 'MONTHLY', 29.99, 30, 20),
+       (1, 'Pro Yearly', 'Best value for established teams. Save 17%.', 'YEARLY', 299.00, 365, 20),
+       (1, 'Enterprise', 'Unlimited access with priority support.', 'YEARLY', 999.00, 365, NULL);
 
 
 -- =============================================================
