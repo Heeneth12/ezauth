@@ -3,6 +3,7 @@ package com.ezh.ezauth.tenant.dto;
 
 import com.ezh.ezauth.common.dto.AddressDto;
 import com.ezh.ezauth.common.dto.ApplicationDto;
+import com.ezh.ezauth.subscription.dto.SubscriptionDto;
 import com.ezh.ezauth.user.dto.UserMiniDto;
 import lombok.*;
 
@@ -25,4 +26,5 @@ public class TenantDto {
     private Set<ApplicationDto> applications;
     private Set<AddressDto> tenantAddress;
     private TenantDetailsDto tenantDetails;
+    private SubscriptionDto subscription;
 }
