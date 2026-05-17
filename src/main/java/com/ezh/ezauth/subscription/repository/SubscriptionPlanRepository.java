@@ -1,6 +1,8 @@
 package com.ezh.ezauth.subscription.repository;
 
 import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,5 +13,5 @@ import java.util.Optional;
 public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPlan, Long> {
     Optional<SubscriptionPlan> findByName(String name);
     List<SubscriptionPlan> findByIsActiveTrue();
-
+    Page<SubscriptionPlan> findByIsActive(Boolean isActive, Pageable pageable);
 }

@@ -2,7 +2,9 @@ package com.ezh.ezauth.subscription.controller;
 
 import com.ezh.ezauth.subscription.dto.SubscriptionDto;
 import com.ezh.ezauth.subscription.dto.SubscriptionPlanDto;
+import com.ezh.ezauth.subscription.dto.SubscriptionPlanSummaryDto;
 import com.ezh.ezauth.subscription.service.SubscriptionService;
+import org.springframework.data.domain.Page;
 import com.ezh.ezauth.utils.common.CommonResponse;
 import com.ezh.ezauth.utils.common.ResponseResource;
 import com.ezh.ezauth.utils.exception.CommonException;
@@ -71,6 +73,16 @@ public class SubscriptionController {
         log.info("Entered disable subscription plan for id: {}", planId);
         CommonResponse response = subscriptionService.disablePlan(planId);
         return ResponseResource.success(HttpStatus.OK, response, "Subscription plan disabled successfully");
+    }
+
+    @GetMapping(value = "/plan/all", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseResource<Page<SubscriptionPlanSummaryDto>> getAllPlans(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Boolean isActive) {
+        log.info("Entered get all subscription plans - page: {}, size: {}, isActive: {}", page, size, isActive);
+        Page<SubscriptionPlanSummaryDto> response = subscriptionService.getPlansPage(page, size, isActive);
+        return ResponseResource.success(HttpStatus.OK, response, "Subscription plans fetched successfully");
     }
 
     @GetMapping(value = "/active", produces = MediaType.APPLICATION_JSON_VALUE)

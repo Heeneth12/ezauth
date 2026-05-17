@@ -2,6 +2,7 @@ package com.ezh.ezauth.subscription.service;
 
 import com.ezh.ezauth.subscription.dto.SubscriptionDto;
 import com.ezh.ezauth.subscription.dto.SubscriptionPlanDto;
+import com.ezh.ezauth.subscription.dto.SubscriptionPlanSummaryDto;
 import com.ezh.ezauth.subscription.entity.Subscription;
 import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
 import com.ezh.ezauth.subscription.entity.SubscriptionStatus;
@@ -19,6 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -201,6 +206,15 @@ public class SubscriptionService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public Page<SubscriptionPlanSummaryDto> getPlansPage(int page, int size, Boolean isActive) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<SubscriptionPlan> plans = isActive != null
+                ? planRepository.findByIsActive(isActive, pageable)
+                : planRepository.findAll(pageable);
+        return plans.map(this::mapToSummaryDto);
+    }
+
     public SubscriptionPlanDto getPlanById(Long id) throws CommonException {
         SubscriptionPlan plan = planRepository.findById(id)
                 .orElseThrow(() -> new CommonException("Subscription plan not found with id: " + id, HttpStatus.BAD_REQUEST));
@@ -212,6 +226,25 @@ public class SubscriptionService {
      */
     public Boolean hasValidSubscription(Long tenantId) {
         return subscriptionRepository.findValidSubscription(tenantId, SubscriptionStatus.ACTIVE, LocalDateTime.now()).isPresent();
+    }
+
+    private SubscriptionPlanSummaryDto mapToSummaryDto(SubscriptionPlan plan) {
+        SubscriptionPlanSummaryDto.MiniApplicationDto appDto = SubscriptionPlanSummaryDto.MiniApplicationDto.builder()
+                .id(plan.getApplication().getId())
+                .appName(plan.getApplication().getAppName())
+                .appKey(plan.getApplication().getAppKey())
+                .build();
+        return SubscriptionPlanSummaryDto.builder()
+                .id(plan.getId())
+                .name(plan.getName())
+                .description(plan.getDescription())
+                .type(plan.getType())
+                .price(plan.getPrice())
+                .durationDays(plan.getDurationDays())
+                .maxUsers(plan.getMaxUsers())
+                .isActive(plan.getIsActive())
+                .application(appDto)
+                .build();
     }
 
     // Helper mapper
