@@ -14,6 +14,8 @@ import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.security.JwtTokenProvider;
+import com.ezh.ezauth.subscription.dto.SubscriptionDto;
+import com.ezh.ezauth.subscription.dto.SubscriptionPlanDto;
 import com.ezh.ezauth.subscription.entity.Subscription;
 import com.ezh.ezauth.subscription.entity.SubscriptionPlan;
 import com.ezh.ezauth.subscription.entity.SubscriptionStatus;
@@ -46,6 +48,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -759,6 +762,11 @@ public class TenantService {
                     .collect(Collectors.toSet());
         }
 
+        SubscriptionDto subscriptionDto = subscriptionRepository
+                .findPrimaryActiveSubscription(tenant.getId(), SubscriptionStatus.ACTIVE)
+                .map(this::mapToSubscriptionDto)
+                .orElse(null);
+
         // Build and Return TenantDto
         return TenantDto.builder()
                 .id(tenant.getId())
@@ -772,6 +780,40 @@ public class TenantService {
                 .applications(applicationDtos)
                 .tenantAddress(addressDtos)
                 .tenantDetails(mapEntityToDto(tenant.getTenantDetails()))
+                .subscription(subscriptionDto)
+                .build();
+    }
+
+    private SubscriptionDto mapToSubscriptionDto(Subscription subscription) {
+        long daysRemaining = 0;
+        LocalDateTime now = LocalDateTime.now();
+        if (subscription.getEndDate() != null && now.isBefore(subscription.getEndDate())) {
+            daysRemaining = Duration.between(now, subscription.getEndDate()).toDays();
+        }
+
+        SubscriptionPlan plan = subscription.getPlan();
+        SubscriptionPlanDto planDto = SubscriptionPlanDto.builder()
+                .id(plan.getId())
+                .applicationId(plan.getApplication().getId())
+                .name(plan.getName())
+                .description(plan.getDescription())
+                .type(plan.getType())
+                .price(plan.getPrice())
+                .durationDays(plan.getDurationDays())
+                .maxUsers(plan.getMaxUsers())
+                .isActive(plan.getIsActive())
+                .build();
+
+        return SubscriptionDto.builder()
+                .id(subscription.getId())
+                .plan(planDto)
+                .status(subscription.getStatus())
+                .startDate(subscription.getStartDate())
+                .endDate(subscription.getEndDate())
+                .autoRenew(subscription.getAutoRenew())
+                .createdAt(subscription.getCreatedAt())
+                .isValid(subscription.isValid())
+                .daysRemaining(daysRemaining)
                 .build();
     }
 
