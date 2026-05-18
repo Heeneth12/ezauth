@@ -101,7 +101,7 @@ public class CommonController {
     @GetMapping(value = "/modules/{moduleId}/privileges", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseResource<?> getPrivilegesByModule(@PathVariable Long moduleId) throws CommonException{
         log.info("Entered get privileges for moduleId: {}", moduleId);
-        Object response = new Object();
+        Object response = commonService.getPrivilegesByModule(moduleId);
         return ResponseResource.success(HttpStatus.OK, response, "Privileges fetched successfully");
     }
 

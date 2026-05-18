@@ -2,6 +2,7 @@ package com.ezh.ezauth.common.dto;
 
 import lombok.*;
 
+import java.util.Set;
 
 
 @Getter
@@ -15,5 +16,5 @@ public class ApplicationDto {
     private String appKey;
     private String description;
     private Boolean isActive = true;
-    //private Set<ModuleDto> modules;
+    private Set<ModuleDto> modules;
 }
