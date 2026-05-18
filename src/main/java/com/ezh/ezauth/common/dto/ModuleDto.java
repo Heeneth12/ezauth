@@ -1,6 +1,5 @@
 package com.ezh.ezauth.common.dto;
 
-import com.ezh.ezauth.common.entity.Privilege;
 import lombok.*;
 
 import java.util.Set;

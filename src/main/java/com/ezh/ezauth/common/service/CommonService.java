@@ -10,6 +10,7 @@ import com.ezh.ezauth.common.entity.Privilege;
 import com.ezh.ezauth.common.entity.Role;
 import com.ezh.ezauth.common.repository.ApplicationRepository;
 import com.ezh.ezauth.common.repository.ModuleRepository;
+import com.ezh.ezauth.common.repository.PrivilegeRepository;
 import com.ezh.ezauth.common.repository.RoleRepository;
 import com.ezh.ezauth.tenant.entity.Tenant;
 import com.ezh.ezauth.tenant.repository.TenantRepository;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -39,6 +41,7 @@ public class CommonService {
 
     private final ApplicationRepository applicationRepository;
     private final ModuleRepository moduleRepository;
+    private final PrivilegeRepository privilegeRepository;
     private final RoleRepository roleRepository;
     private final TenantRepository tenantRepository;
     private final UserRoleRepository userRoleRepository;
@@ -141,9 +144,10 @@ public class CommonService {
                 .appName(dto.getAppName())
                 .appKey(dto.getAppKey())
                 .description(dto.getDescription())
-                .isActive(true)
+                .isActive(dto.getIsActive() == null ? Boolean.TRUE : dto.getIsActive())
                 .build();
         app = applicationRepository.save(app);
+        saveApplicationModules(app, dto.getModules());
         tenantRepository.linkApplicationToTenant(tenantId, app.getId());
 
         return CommonResponse.builder().status(Status.SUCCESS).message("Application created successfully").build();
@@ -163,10 +167,19 @@ public class CommonService {
 
         app.setAppName(dto.getAppName());
         app.setDescription(dto.getDescription());
+        if (dto.getAppKey() != null && !dto.getAppKey().equals(app.getAppKey())) {
+            if (applicationRepository.findByAppKey(dto.getAppKey())
+                    .filter(existing -> !existing.getId().equals(appId))
+                    .isPresent()) {
+                throw new CommonException("Application with key '" + dto.getAppKey() + "' already exists", HttpStatus.CONFLICT);
+            }
+            app.setAppKey(dto.getAppKey());
+        }
         if (dto.getIsActive() != null) {
             app.setIsActive(dto.getIsActive());
         }
         applicationRepository.save(app);
+        saveApplicationModules(app, dto.getModules());
 
         return CommonResponse.builder().status(Status.SUCCESS).message("Application updated successfully").build();
     }
@@ -226,6 +239,26 @@ public class CommonService {
         return CommonResponse.builder().status(Status.SUCCESS).message("Role deleted successfully").build();
     }
 
+    @Transactional(readOnly = true)
+    public List<PrivilegeDto> getPrivilegesByModule(Long moduleId) throws CommonException {
+        log.info("Fetching privileges for moduleId={}", moduleId);
+
+        if (!moduleRepository.existsById(moduleId)) {
+            throw new CommonException("Module not found", HttpStatus.NOT_FOUND);
+        }
+
+        List<Privilege> privileges = privilegeRepository.findByModuleId(moduleId);
+
+        if (privileges.isEmpty()) {
+            log.warn("No privileges found for moduleId={}", moduleId);
+            return Collections.emptyList();
+        }
+
+        return privileges.stream()
+                .map(this::constructPrivilegeDto)
+                .toList();
+    }
+
     private ApplicationDto constructDtoFromEntity(Application application) {
 
         if (application == null) return null;
@@ -236,7 +269,75 @@ public class CommonService {
                 .appKey(application.getAppKey())
                 .description(application.getDescription())
                 .isActive(application.getIsActive())
+                .modules(
+                        application.getModules() != null
+                                ? application.getModules()
+                                .stream()
+                                .map(this::constructModuleDto)
+                                .collect(Collectors.toCollection(LinkedHashSet::new))
+                                : Collections.emptySet()
+                )
                 .build();
+    }
+
+
+    private void saveApplicationModules(Application app, Set<ModuleDto> moduleDtos) throws CommonException {
+        if (moduleDtos == null) {
+            return;
+        }
+
+        for (ModuleDto moduleDto : moduleDtos) {
+            Module module = resolveModule(app, moduleDto);
+            module.setModuleName(moduleDto.getModuleName());
+            module.setModuleKey(moduleDto.getModuleKey());
+            module.setDescription(moduleDto.getDescription());
+            module.setIsActive(moduleDto.getIsActive() == null ? Boolean.TRUE : moduleDto.getIsActive());
+            module.setApplication(app);
+            module = moduleRepository.save(module);
+
+            saveModulePrivileges(module, moduleDto.getPrivileges());
+        }
+    }
+
+    private Module resolveModule(Application app, ModuleDto moduleDto) throws CommonException {
+        if (moduleDto.getId() != null) {
+            Module module = moduleRepository.findById(moduleDto.getId())
+                    .orElseThrow(() -> new CommonException("Module not found", HttpStatus.NOT_FOUND));
+
+            if (!module.getApplication().getId().equals(app.getId())) {
+                throw new CommonException("Module does not belong to application", HttpStatus.BAD_REQUEST);
+            }
+
+            return module;
+        }
+
+        return moduleRepository.findByApplicationIdAndModuleKey(app.getId(), moduleDto.getModuleKey())
+                .orElseGet(Module::new);
+    }
+
+    private void saveModulePrivileges(Module module, Set<PrivilegeDto> privilegeDtos) throws CommonException {
+        if (privilegeDtos == null) {
+            return;
+        }
+
+        for (PrivilegeDto privilegeDto : privilegeDtos) {
+            Privilege privilege = resolvePrivilege(module, privilegeDto);
+            privilege.setPrivilegeName(privilegeDto.getPrivilegeName());
+            privilege.setPrivilegeKey(privilegeDto.getPrivilegeKey());
+            privilege.setDescription(privilegeDto.getDescription());
+            privilege.setModule(module);
+            privilegeRepository.save(privilege);
+        }
+    }
+
+    private Privilege resolvePrivilege(Module module, PrivilegeDto privilegeDto) throws CommonException {
+        if (privilegeDto.getId() != null) {
+            return privilegeRepository.findByModule_IdAndId(module.getId(), privilegeDto.getId())
+                    .orElseThrow(() -> new CommonException("Privilege not found", HttpStatus.NOT_FOUND));
+        }
+
+        return privilegeRepository.findByPrivilegeKeyAndModuleId(privilegeDto.getPrivilegeKey(), module.getId())
+                .orElseGet(Privilege::new);
     }
 
 

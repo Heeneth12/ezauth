@@ -13,4 +13,6 @@ public interface ModuleRepository extends JpaRepository<Module, Long> {
     List<Module> findByApplicationId(Long applicationId);
 
     Optional<Module> findByModuleKey(String moduleKey);
+
+    Optional<Module> findByApplicationIdAndModuleKey(Long applicationId, String moduleKey);
 }
